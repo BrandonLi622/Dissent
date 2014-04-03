@@ -8,7 +8,7 @@ SFTViewManager::SFTViewManager(const Identity::Roster &servers,
     m_servers(servers),
     m_ident(ident)
 {
-
+    this->downServers = new QVector<Connections::Id>();
     this->numServers = m_servers.Count();
     this->quorumRatio = quorumRatio;
     this->viewNum = 0;
@@ -28,6 +28,49 @@ bool SFTViewManager::inCurrentView(const Connections::Id &nodeId)
 {
     int index = this->m_servers.GetIndex(nodeId);
     return (*(this->currentView))[index];
+}
+
+bool SFTViewManager::addFailedServer(const Connections::Id &nodeId)
+{
+    this->downServers->append(nodeId);
+    return this->inCurrentView(nodeId);
+}
+
+int SFTViewManager::proposeViewChange(int minViewNum)
+{
+    QVector<bool> *viewMembership = calcServerMembership(minViewNum);
+    for (int j = 0; j < this->downServers->count(); j++)
+    {
+        const Connections::Id downServer = downServers->at(j);
+        int index = this->m_servers.GetIndex(downServer);
+
+        //If any of the down servers are in a particular view, try the next view
+        if (viewMembership->at(index))
+        {
+            proposeViewChange(minViewNum + 1);
+        }
+    }
+
+    //If we got here none of the bad servers are in the next view
+    return minViewNum;
+}
+
+QList<int> SFTViewManager::proposeViewChanges(int n)
+{
+    QList<int> *proposedChanges = new QList<int>();
+    int minViewNum = this->viewNum + 1; //View change must be at least 1 greater than current view
+    for (int i = 0; i < n; i++)
+    {
+        int proposal = proposeViewChange(minViewNum);
+        proposedChanges->append(proposal);
+        minViewNum = proposal + 1;
+    }
+    return *proposedChanges;
+}
+
+bool SFTViewManager::tooFewServers()
+{
+    return this->downServers->count() >= 2.0 * this->numServers / 3.0;
 }
 
 void SFTViewManager::startViewChangeProposal(int viewNum)

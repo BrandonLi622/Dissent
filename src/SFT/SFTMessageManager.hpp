@@ -5,15 +5,21 @@
 
 namespace Dissent {
 namespace SFT {
-class SFTMessageManager
+class SFTMessageManager : public QObject
 {
+    Q_OBJECT
+    Q_ENUMS(MessageTypes)
+
 public:
     //-Notify client of view change   (broadcast to clients)       <== ALL
-    //-Propose view change            (broadcast to servers)       <== PROPOSER (ditch this, just have everyone cast n votes)
     //-Vote on the view change        (broadcast to servers?)      <== ALL
-    //-Announce view change           (broadcast to servers)       <== PROPOSER
 
     //TODO: I suppose I can make this class static
+
+    enum MessageTypes {
+      ViewChangeVote,
+      ViewChangeNotification
+    };
 
     SFTMessageManager();
 

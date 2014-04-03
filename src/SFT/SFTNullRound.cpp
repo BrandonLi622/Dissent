@@ -41,7 +41,7 @@ namespace SFT {
     QPair<QByteArray, bool> data = GetData(1024);
     QByteArray msg = data.first;
     msg.prepend(127);
-    GetOverlay()->Broadcast("SessionData", msg);
+    //GetOverlay()->Broadcast("SessionData", msg);
 
     //TODO: Need to make sure that the round has access to the session
 
@@ -49,9 +49,7 @@ namespace SFT {
     //I can do GetOverlay()->SendNotification(&to, &method, &data);
     //Let's suppose we want to send these types of messages:
     //-Notify client of view change   (broadcast to clients)       <== ALL
-    //-Propose view change            (broadcast to servers)       <== PROPOSER
     //-Vote on the view change        (broadcast to servers?)      <== ALL
-    //-Announce view change           (broadcast to servers)       <== PROPOSER
 
     //Some other protocol for selecting a new proposer...TODO
 
@@ -61,13 +59,32 @@ namespace SFT {
 
   void SFTNullRound::ClientOnStart()
   {
-
+      QByteArray msg;
+      QVariantMap map;
+      map.insert("Type", 3);
+      QVariant variant(map);
+      QByteArray data;
+      QDataStream stream(&data,QIODevice::WriteOnly);
+      stream << variant;
+      msg.append(data);
+      msg.prepend(127);
+      GetOverlay()->Broadcast("SessionData", msg);
   }
 
   void SFTNullRound::ServerOnStart()
   {
-
+      QByteArray msg;
+      QVariantMap map;
+      map.insert("Type", "Server Message");
+      QVariant variant(map);
+      QByteArray data;
+      QDataStream stream(&data,QIODevice::WriteOnly);
+      stream << variant;
+      msg.append(data);
+      msg.prepend(127);
+      GetOverlay()->Broadcast("SessionData", msg);
   }
+
 
   void SFTNullRound::ProcessPacket(const Connections::Id &from, const QByteArray &data)
   {
@@ -91,6 +108,14 @@ namespace SFT {
     }
 
 
+
+
+
+    // 1) Instead of checking for duplicates, I should look at what type of message it is and do the appropriate action
+    // 2) Keep track of who send messages but terminate round when we receive from everyone in the view, not entire server list
+    // 3) Everything else stays the same
+
+    /*
     //MOVE THIS
     int idx = 0;
     if(GetOverlay()->IsServer(from)) {
@@ -98,12 +123,6 @@ namespace SFT {
     } else {
       idx = GetServers().Count() + GetClients().GetIndex(from);
     }
-
-
-    // 1) Instead of checking for duplicates, I should look at what type of message it is and do the appropriate action
-    // 2) Keep track of who send messages but terminate round when we receive from everyone in the view, not entire server list
-    // 3) Everything else stays the same
-
     if(!m_received[idx].isEmpty()) {
       qWarning() << "Receiving a second message from: " << from;
       return;
@@ -130,7 +149,7 @@ namespace SFT {
     }
 
     SetSuccessful(true);
-    Stop("Round successfully finished.");
+    Stop("Round successfully finished.");*/
   }
 
   void SFTNullRound::ClientProcessPacket(const Connections::Id &from, const QByteArray &data)
@@ -138,7 +157,13 @@ namespace SFT {
       //GetOverlay()->SendNotification(from, "TEST", data);
 
       qDebug() << "THIS IS BRANDON'S";
-      qDebug() << data << from;
+
+      QByteArray data2(data); //So that we can have a pointer to it
+      QDataStream stream(&data2,QIODevice::ReadOnly);
+      QVariant variant;
+      stream>>variant;
+      qDebug()<< qvariant_cast<QVariantMap>(variant);
+      qDebug() << from;
 
 
       /*
@@ -189,7 +214,9 @@ namespace SFT {
 
   void SFTNullRound::ServerProcessPacket(const Connections::Id &from, const QByteArray &data)
   {
-      GetOverlay()->SendNotification(from, "TEST", data);
+      qDebug() << from;
+      qDebug() << data;
+      //GetOverlay()->SendNotification(from, "TEST", data);
   }
 }
 }

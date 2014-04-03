@@ -220,6 +220,27 @@ namespace Tests {
 
   }
 
+  TEST(Check, Check2)
+  {
+      Timer::GetInstance().UseVirtualTime();
+      ConnectionManager::UseTimer = false;
+      OverlayNetwork net = ConstructOverlay(1, 10);
+      VerifyStoppedNetwork(net);
+      StartNetwork(net);
+      VerifyNetwork(net);
+
+      Sessions sessions = BuildSessions(net);
+      qDebug() << "Starting sessions...";
+      StartSessions(sessions);
+      SendTest(sessions);
+
+      StopSessions(sessions);
+
+      StopNetwork(sessions.network);
+      VerifyStoppedNetwork(sessions.network);
+      ConnectionManager::UseTimer = true;
+  }
+
   TEST(Session, Servers)
   {
     Timer::GetInstance().UseVirtualTime();
