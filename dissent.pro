@@ -32,11 +32,17 @@ INCLUDEPATH += ext/qhttpserver/src
 HEADERS += ext/qhttpserver/src/qhttpconnection.h \
            ext/qhttpserver/src/qhttprequest.h \
            ext/qhttpserver/src/qhttpresponse.h \
-           ext/qhttpserver/src/qhttpserver.h
+           ext/qhttpserver/src/qhttpserver.h \
+    src/SFT/SFTViewManager.hpp \
+    src/SFT/SFTNullRound.hpp \
+    src/SFT/SFTMessageManager.hpp
 SOURCES += ext/qhttpserver/src/qhttpconnection.cpp \
            ext/qhttpserver/src/qhttprequest.cpp \
            ext/qhttpserver/src/qhttpresponse.cpp \
-           ext/qhttpserver/src/qhttpserver.cpp
+           ext/qhttpserver/src/qhttpserver.cpp \
+    src/SFT/SFTViewManager.cpp \
+    src/SFT/SFTNullRound.cpp \
+    src/SFT/SFTMessageManager.cpp
 
 # Joyent HTTP Parser in QHttpServer
 INCLUDEPATH += ext/qhttpserver/http-parser

@@ -1,7 +1,15 @@
 #include "DissentTest.hpp"
 #include "OverlayTest.hpp"
 
+#include "SFT/SFTNullRound.hpp"
+
 namespace Dissent {
+
+namespace SFT {
+    class SFTNullRound;
+}
+
+
 namespace Tests {
   typedef QSharedPointer<ServerSession> ServerPointer;
   typedef QSharedPointer<ClientSession> ClientPointer;
@@ -32,7 +40,7 @@ namespace Tests {
       keys->AddKey(server->GetId().ToString(), key->GetPublicKey());
 
       ServerPointer ss = MakeSession<ServerSession>(
-            server, key, keys, TCreateRound<NullRound>);
+            server, key, keys, TCreateRound<SFT::SFTNullRound>);
       sessions.servers.append(ss);
       sessions.private_keys[server->GetId().ToString()] = key;
 
@@ -49,7 +57,7 @@ namespace Tests {
       keys->AddKey(client->GetId().ToString(), key->GetPublicKey());
 
       ClientPointer cs = MakeSession<ClientSession>(
-            client, key, keys, TCreateRound<NullRound>);
+            client, key, keys, TCreateRound<SFT::SFTNullRound>);
       sessions.clients.append(cs);
       sessions.private_keys[client->GetId().ToString()] = key;
 
@@ -172,7 +180,7 @@ namespace Tests {
       sessions.network.first[idx] = op;
       ServerPointer ss = MakeSession<ServerSession>(
             op, sessions.private_keys[op->GetId().ToString()],
-            sessions.keys, TCreateRound<NullRound>);
+            sessions.keys, TCreateRound<SFT::SFTNullRound>);
       sessions.servers[idx] = ss;
 
       QSharedPointer<BufferSink> sink(new BufferSink());
@@ -196,6 +204,20 @@ namespace Tests {
       }
     }
     StartRound(sessions);
+  }
+
+  //Brandon's test (not sure where else to put this
+
+  TEST(Check, Check)
+  {
+      RecordProperty("Test", "Checks");
+      RecordProperty("Brandon", "Li");
+
+      qDebug() << "WHAT";
+
+      ASSERT_EQ(1, 1);
+
+
   }
 
   TEST(Session, Servers)
@@ -252,7 +274,7 @@ namespace Tests {
   {
     Timer::GetInstance().UseVirtualTime();
     ConnectionManager::UseTimer = false;
-    OverlayNetwork net = ConstructOverlay(10, 100);
+    OverlayNetwork net = ConstructOverlay(3, 10);
     VerifyStoppedNetwork(net);
     StartNetwork(net);
     VerifyNetwork(net);
