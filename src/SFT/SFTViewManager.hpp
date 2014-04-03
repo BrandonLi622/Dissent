@@ -47,8 +47,8 @@ private:
     const Identity::PrivateIdentity m_ident;
 
     double quorumRatio;
-    int proposedNewView;
-    int numApproves;
+
+    QVariantMap *viewProposals;
 
     QVector<Connections::Id> *downServers;
 

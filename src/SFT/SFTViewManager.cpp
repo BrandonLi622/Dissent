@@ -15,6 +15,8 @@ SFTViewManager::SFTViewManager(const Identity::Roster &servers,
     this->currentView = new QVector<bool>();
     setNewView(this->viewNum);
 
+    this->viewProposals = new QVariantMap();
+
     qDebug() << "SFTViewManager constructor IS WORKING" << *(this->currentView);
     //qDebug() << this->currentView;
 }
@@ -75,9 +77,6 @@ bool SFTViewManager::tooFewServers()
 
 void SFTViewManager::startViewChangeProposal(int viewNum)
 {
-    this->proposedNewView = viewNum;
-    this->numApproves = 0;
-
     //TODO: Maybe start some sort of timer
 }
 
