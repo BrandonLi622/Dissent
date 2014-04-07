@@ -1,18 +1,22 @@
 #include "DissentTest.hpp"
 #include "OverlayTest.hpp"
-#include "SessionTest.hpp"
-
-#include "SFT/SFTNullRound.hpp"
 
 namespace Dissent {
-
-namespace SFT {
-    class SFTNullRound;
-}
-
-
 namespace Tests {
-  Sessions BuildSessions(const OverlayNetwork &network, CreateRound create_round)
+  typedef QSharedPointer<ServerSession> ServerPointer;
+  typedef QSharedPointer<ClientSession> ClientPointer;
+
+  class Sessions {
+    public:
+      OverlayNetwork network;
+      QList<ServerPointer> servers;
+      QList<ClientPointer> clients;
+      QHash<QString, QSharedPointer<AsymmetricKey> > private_keys;
+      QSharedPointer<KeyShare> keys;
+      QList<QSharedPointer<BufferSink> > sinks;
+  };
+
+  Sessions BuildSessions(const OverlayNetwork &network)
   {
     DsaPrivateKey shared_key;
     QSharedPointer<KeyShare> keys(new KeyShare());
@@ -20,7 +24,6 @@ namespace Tests {
     Sessions sessions;
     sessions.network = network;
     sessions.keys = keys;
-    sessions.create_round = create_round;
 
     foreach(const OverlayPointer &server, network.first) {
       QSharedPointer<AsymmetricKey> key(new DsaPrivateKey(
@@ -29,26 +32,13 @@ namespace Tests {
       keys->AddKey(server->GetId().ToString(), key->GetPublicKey());
 
       ServerPointer ss = MakeSession<ServerSession>(
-<<<<<<< HEAD
-            server, key, keys, TCreateRound<SFT::SFTNullRound>);
-=======
-            server, key, keys, create_round);
->>>>>>> 9e513a0ee07aec90ab1deb1708ac07cdd109cd19
+            server, key, keys, TCreateRound<NullRound>);
       sessions.servers.append(ss);
       sessions.private_keys[server->GetId().ToString()] = key;
 
       QSharedPointer<BufferSink> sink(new BufferSink());
       sessions.sinks.append(sink);
-
-      QSharedPointer<SignalSink> ssink(new SignalSink());
-      sessions.signal_sinks.append(ssink);
-
-      QSharedPointer<SinkMultiplexer> sinkm(new SinkMultiplexer());
-      sessions.sink_multiplexers.append(sinkm);
-      sinkm->AddSink(sink);
-      sinkm->AddSink(ssink);
-
-      ss->SetSink(sinkm.data());
+      ss->SetSink(sink.data());
     }
 
     QList<ClientPointer> clients;
@@ -59,26 +49,13 @@ namespace Tests {
       keys->AddKey(client->GetId().ToString(), key->GetPublicKey());
 
       ClientPointer cs = MakeSession<ClientSession>(
-<<<<<<< HEAD
-            client, key, keys, TCreateRound<SFT::SFTNullRound>);
-=======
-            client, key, keys, create_round);
->>>>>>> 9e513a0ee07aec90ab1deb1708ac07cdd109cd19
+            client, key, keys, TCreateRound<NullRound>);
       sessions.clients.append(cs);
       sessions.private_keys[client->GetId().ToString()] = key;
 
       QSharedPointer<BufferSink> sink(new BufferSink());
       sessions.sinks.append(sink);
-
-      QSharedPointer<SignalSink> ssink(new SignalSink());
-      sessions.signal_sinks.append(ssink);
-
-      QSharedPointer<SinkMultiplexer> sinkm(new SinkMultiplexer());
-      sessions.sink_multiplexers.append(sinkm);
-      sinkm->AddSink(sink);
-      sinkm->AddSink(ssink);
-
-      cs->SetSink(sinkm.data());
+      cs->SetSink(sink.data());
     }
     
     return sessions;
@@ -152,27 +129,20 @@ namespace Tests {
       sink->Clear();
     }
 
-    SignalCounter sc;
-    foreach(const QSharedPointer<SignalSink> &ssink, sessions.signal_sinks) {
-      QObject::connect(ssink.data(),
-          SIGNAL(IncomingData(const QByteArray &)),
-          &sc,
-          SLOT(Counter()));
-    }
-
     foreach(const ClientPointer &cs, sessions.clients) {
-      QByteArray msg(64, 0);
+      QByteArray msg(128, 0);
       rand.GenerateBlock(msg);
       messages.append(msg);
       cs->Send(msg);
     }
 
-    RunUntil(sc, sessions.clients.size() * (sessions.clients.size() + sessions.servers.size()));
+    StartRound(sessions);
+    CompleteRound(sessions);
 
     foreach(const QSharedPointer<BufferSink> &sink, sessions.sinks) {
-      ASSERT_EQ(messages.size(), sink->Count());
+      EXPECT_EQ(messages.size(), sink->Count());
       for(int idx = 0; idx < sink->Count(); idx++) {
-        ASSERT_TRUE(messages.contains(sink->At(idx).second));
+        EXPECT_EQ(messages[idx], sink->At(idx).second);
       }
     }
     qDebug() << "Finished SendTest";
@@ -202,19 +172,20 @@ namespace Tests {
       sessions.network.first[idx] = op;
       ServerPointer ss = MakeSession<ServerSession>(
             op, sessions.private_keys[op->GetId().ToString()],
-<<<<<<< HEAD
-            sessions.keys, TCreateRound<SFT::SFTNullRound>);
-=======
-            sessions.keys, sessions.create_round);
->>>>>>> 9e513a0ee07aec90ab1deb1708ac07cdd109cd19
+            sessions.keys, TCreateRound<NullRound>);
       sessions.servers[idx] = ss;
-      ss->SetSink(sessions.sink_multiplexers[idx].data());
+    }
+    qDebug() << "Finished SendTest";
+  }
+
+      QSharedPointer<BufferSink> sink(new BufferSink());
+      sessions.sinks[idx] = sink;
+      ss->SetSink(sink.data());
 
       op->Start();
       ss->Start();
     } else {
-      // 1 for the node itself and 1 for at least another peer
-      int disc_count = qMax(2, rand.GetInt(0, server_count));
+      int disc_count = rand.GetInt(0, server_count - 1);
       QHash<int, bool> disced;
       disced[idx] = true;
       while(disced.size() < disc_count) {
@@ -227,45 +198,7 @@ namespace Tests {
         op_disc->GetConnectionTable().GetConnection(remote)->Disconnect();
       }
     }
-
-    qDebug() << "Disconnecting done";
     StartRound(sessions);
-    qDebug() << "Round started after disconnection";
-  }
-
-  //Brandon's test (not sure where else to put this
-
-  TEST(Check, Check)
-  {
-      RecordProperty("Test", "Checks");
-      RecordProperty("Brandon", "Li");
-
-      qDebug() << "WHAT";
-
-      ASSERT_EQ(1, 1);
-
-
-  }
-
-  TEST(Check, Check2)
-  {
-      Timer::GetInstance().UseVirtualTime();
-      ConnectionManager::UseTimer = false;
-      OverlayNetwork net = ConstructOverlay(1, 10);
-      VerifyStoppedNetwork(net);
-      StartNetwork(net);
-      VerifyNetwork(net);
-
-      Sessions sessions = BuildSessions(net);
-      qDebug() << "Starting sessions...";
-      StartSessions(sessions);
-      SendTest(sessions);
-
-      StopSessions(sessions);
-
-      StopNetwork(sessions.network);
-      VerifyStoppedNetwork(sessions.network);
-      ConnectionManager::UseTimer = true;
   }
 
   TEST(Session, Servers)
@@ -280,7 +213,6 @@ namespace Tests {
     Sessions sessions = BuildSessions(net);
     qDebug() << "Starting sessions...";
     StartSessions(sessions);
-    StartRound(sessions);
     SendTest(sessions);
     SendTest(sessions);
     DisconnectServer(sessions, true);
@@ -307,7 +239,6 @@ namespace Tests {
     Sessions sessions = BuildSessions(net);
     qDebug() << "Starting sessions...";
     StartSessions(sessions);
-    StartRound(sessions);
     SendTest(sessions);
     SendTest(sessions);
     DisconnectServer(sessions, true);
@@ -324,7 +255,7 @@ namespace Tests {
   {
     Timer::GetInstance().UseVirtualTime();
     ConnectionManager::UseTimer = false;
-    OverlayNetwork net = ConstructOverlay(3, 10);
+    OverlayNetwork net = ConstructOverlay(10, 100);
     VerifyStoppedNetwork(net);
     StartNetwork(net);
     VerifyNetwork(net);
@@ -332,7 +263,6 @@ namespace Tests {
     Sessions sessions = BuildSessions(net);
     qDebug() << "Starting sessions...";
     StartSessions(sessions);
-    StartRound(sessions);
     SendTest(sessions);
     SendTest(sessions);
     DisconnectServer(sessions, true);
