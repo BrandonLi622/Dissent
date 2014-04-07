@@ -18,6 +18,11 @@ namespace Identity {
     return m_id_to_int[id];
   }
 
+  Connections::Id Roster::GetId(int index) const
+  {
+    return m_roster[index].GetId();
+  }
+
   bool Roster::Contains(const Connections::Id &id) const
   {
     return m_id_to_int.contains(id);
@@ -31,6 +36,20 @@ namespace Identity {
       return QSharedPointer<Crypto::AsymmetricKey>();
     }
     return m_roster[index].GetKey();
+  }
+
+  QSharedPointer<Crypto::AsymmetricKey> Roster::GetKey(int index) const
+  {
+    return m_roster[index].GetKey();
+  }
+
+  PublicIdentity Roster::GetIdentity(const Connections::Id &id) const
+  {
+    int index = GetIndex(id);
+    if(index == -1) {
+      return PublicIdentity();
+    }
+    return m_roster[index];
   }
 }
 }

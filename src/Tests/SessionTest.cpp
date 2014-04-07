@@ -1,5 +1,6 @@
 #include "DissentTest.hpp"
 #include "OverlayTest.hpp"
+#include "SessionTest.hpp"
 
 #include "SFT/SFTNullRound.hpp"
 
@@ -11,20 +12,7 @@ namespace SFT {
 
 
 namespace Tests {
-  typedef QSharedPointer<ServerSession> ServerPointer;
-  typedef QSharedPointer<ClientSession> ClientPointer;
-
-  class Sessions {
-    public:
-      OverlayNetwork network;
-      QList<ServerPointer> servers;
-      QList<ClientPointer> clients;
-      QHash<QString, QSharedPointer<AsymmetricKey> > private_keys;
-      QSharedPointer<KeyShare> keys;
-      QList<QSharedPointer<BufferSink> > sinks;
-  };
-
-  Sessions BuildSessions(const OverlayNetwork &network)
+  Sessions BuildSessions(const OverlayNetwork &network, CreateRound create_round)
   {
     DsaPrivateKey shared_key;
     QSharedPointer<KeyShare> keys(new KeyShare());
@@ -32,6 +20,7 @@ namespace Tests {
     Sessions sessions;
     sessions.network = network;
     sessions.keys = keys;
+    sessions.create_round = create_round;
 
     foreach(const OverlayPointer &server, network.first) {
       QSharedPointer<AsymmetricKey> key(new DsaPrivateKey(
@@ -40,13 +29,26 @@ namespace Tests {
       keys->AddKey(server->GetId().ToString(), key->GetPublicKey());
 
       ServerPointer ss = MakeSession<ServerSession>(
+<<<<<<< HEAD
             server, key, keys, TCreateRound<SFT::SFTNullRound>);
+=======
+            server, key, keys, create_round);
+>>>>>>> 9e513a0ee07aec90ab1deb1708ac07cdd109cd19
       sessions.servers.append(ss);
       sessions.private_keys[server->GetId().ToString()] = key;
 
       QSharedPointer<BufferSink> sink(new BufferSink());
       sessions.sinks.append(sink);
-      ss->SetSink(sink.data());
+
+      QSharedPointer<SignalSink> ssink(new SignalSink());
+      sessions.signal_sinks.append(ssink);
+
+      QSharedPointer<SinkMultiplexer> sinkm(new SinkMultiplexer());
+      sessions.sink_multiplexers.append(sinkm);
+      sinkm->AddSink(sink);
+      sinkm->AddSink(ssink);
+
+      ss->SetSink(sinkm.data());
     }
 
     QList<ClientPointer> clients;
@@ -57,13 +59,26 @@ namespace Tests {
       keys->AddKey(client->GetId().ToString(), key->GetPublicKey());
 
       ClientPointer cs = MakeSession<ClientSession>(
+<<<<<<< HEAD
             client, key, keys, TCreateRound<SFT::SFTNullRound>);
+=======
+            client, key, keys, create_round);
+>>>>>>> 9e513a0ee07aec90ab1deb1708ac07cdd109cd19
       sessions.clients.append(cs);
       sessions.private_keys[client->GetId().ToString()] = key;
 
       QSharedPointer<BufferSink> sink(new BufferSink());
       sessions.sinks.append(sink);
-      cs->SetSink(sink.data());
+
+      QSharedPointer<SignalSink> ssink(new SignalSink());
+      sessions.signal_sinks.append(ssink);
+
+      QSharedPointer<SinkMultiplexer> sinkm(new SinkMultiplexer());
+      sessions.sink_multiplexers.append(sinkm);
+      sinkm->AddSink(sink);
+      sinkm->AddSink(ssink);
+
+      cs->SetSink(sinkm.data());
     }
     
     return sessions;
@@ -137,20 +152,27 @@ namespace Tests {
       sink->Clear();
     }
 
+    SignalCounter sc;
+    foreach(const QSharedPointer<SignalSink> &ssink, sessions.signal_sinks) {
+      QObject::connect(ssink.data(),
+          SIGNAL(IncomingData(const QByteArray &)),
+          &sc,
+          SLOT(Counter()));
+    }
+
     foreach(const ClientPointer &cs, sessions.clients) {
-      QByteArray msg(128, 0);
+      QByteArray msg(64, 0);
       rand.GenerateBlock(msg);
       messages.append(msg);
       cs->Send(msg);
     }
 
-    StartRound(sessions);
-    CompleteRound(sessions);
+    RunUntil(sc, sessions.clients.size() * (sessions.clients.size() + sessions.servers.size()));
 
     foreach(const QSharedPointer<BufferSink> &sink, sessions.sinks) {
-      EXPECT_EQ(messages.size(), sink->Count());
+      ASSERT_EQ(messages.size(), sink->Count());
       for(int idx = 0; idx < sink->Count(); idx++) {
-        EXPECT_EQ(messages[idx], sink->At(idx).second);
+        ASSERT_TRUE(messages.contains(sink->At(idx).second));
       }
     }
     qDebug() << "Finished SendTest";
@@ -180,17 +202,19 @@ namespace Tests {
       sessions.network.first[idx] = op;
       ServerPointer ss = MakeSession<ServerSession>(
             op, sessions.private_keys[op->GetId().ToString()],
+<<<<<<< HEAD
             sessions.keys, TCreateRound<SFT::SFTNullRound>);
+=======
+            sessions.keys, sessions.create_round);
+>>>>>>> 9e513a0ee07aec90ab1deb1708ac07cdd109cd19
       sessions.servers[idx] = ss;
-
-      QSharedPointer<BufferSink> sink(new BufferSink());
-      sessions.sinks[idx] = sink;
-      ss->SetSink(sink.data());
+      ss->SetSink(sessions.sink_multiplexers[idx].data());
 
       op->Start();
       ss->Start();
     } else {
-      int disc_count = rand.GetInt(0, server_count - 1);
+      // 1 for the node itself and 1 for at least another peer
+      int disc_count = qMax(2, rand.GetInt(0, server_count));
       QHash<int, bool> disced;
       disced[idx] = true;
       while(disced.size() < disc_count) {
@@ -203,7 +227,10 @@ namespace Tests {
         op_disc->GetConnectionTable().GetConnection(remote)->Disconnect();
       }
     }
+
+    qDebug() << "Disconnecting done";
     StartRound(sessions);
+    qDebug() << "Round started after disconnection";
   }
 
   //Brandon's test (not sure where else to put this
@@ -253,6 +280,7 @@ namespace Tests {
     Sessions sessions = BuildSessions(net);
     qDebug() << "Starting sessions...";
     StartSessions(sessions);
+    StartRound(sessions);
     SendTest(sessions);
     SendTest(sessions);
     DisconnectServer(sessions, true);
@@ -279,6 +307,7 @@ namespace Tests {
     Sessions sessions = BuildSessions(net);
     qDebug() << "Starting sessions...";
     StartSessions(sessions);
+    StartRound(sessions);
     SendTest(sessions);
     SendTest(sessions);
     DisconnectServer(sessions, true);
@@ -303,6 +332,7 @@ namespace Tests {
     Sessions sessions = BuildSessions(net);
     qDebug() << "Starting sessions...";
     StartSessions(sessions);
+    StartRound(sessions);
     SendTest(sessions);
     SendTest(sessions);
     DisconnectServer(sessions, true);

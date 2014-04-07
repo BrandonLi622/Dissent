@@ -25,6 +25,8 @@ public:
 
     QByteArray genViewChangeProposal(QVariantList viewNums);
     QByteArray genClientViewChangeNotification(quint32 newViewNum);
+    QByteArray encryptionKey(quint64 serverID, quint64 clientID, quint32 keyLength);
+
 };
 }
 }

@@ -1,6 +1,10 @@
 #ifndef DISSENT_DISSENT_H_GUARD
 #define DISSENT_DISSENT_H_GUARD
 
+#include "Anonymity/BaseDCNetRound.hpp"
+#include "Anonymity/CSDCNetRound.hpp"
+#include "Anonymity/Log.hpp"
+#include "Anonymity/NeffShuffleRound.hpp"
 #include "Anonymity/NullRound.hpp"
 #include "Anonymity/Round.hpp"
 
@@ -98,6 +102,7 @@
 #include "Session/SerializeList.hpp"
 #include "Session/ServerAgree.hpp"
 #include "Session/ServerEnlist.hpp"
+#include "Session/ServerEnlisted.hpp"
 #include "Session/ServerInit.hpp"
 #include "Session/ServerList.hpp"
 #include "Session/ServerQueued.hpp"

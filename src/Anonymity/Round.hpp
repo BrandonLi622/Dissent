@@ -150,6 +150,16 @@ namespace Anonymity {
        */
       QDateTime GetStartTime() const { return m_start_time; }
 
+      /**
+       * Sets the header bytes
+       */
+      void SetHeaderBytes(const QByteArray &header) { m_header = header; }
+
+      /**
+       * Return the header bytes
+       */
+      QByteArray GetHeaderBytes() const { return m_header; }
+
     signals:
       /**
        * Emitted when the Round is closed for good or bad.
@@ -177,26 +187,30 @@ namespace Anonymity {
       bool Verify(const Connections::Id &from, const QByteArray &data, QByteArray &msg);
 
       /**
-       * Signs and encrypts a message before broadcasting
-       * @param data the message to broadcast
+       * Signs and encrypts a message before sending it to all participants
+       * @param data the message to send
        */
-      virtual inline void VerifiableBroadcast(const QByteArray &data)
-      {
-        QByteArray msg = data + GetKey()->Sign(data);
-        GetOverlay()->Broadcast("Session::Data", msg);
-      }
+      void VerifiableBroadcast(const QByteArray &data);
+
+      /**
+       * Signs and encrypts a message before sending it to all downstream clients
+       * @param data the message to send
+       */
+      void VerifiableBroadcastToClients(const QByteArray &data);
+
+      /**
+       * Signs and encrypts a message before sending it to all servers
+       * @param data the message to send
+       */
+      void VerifiableBroadcastToServers(const QByteArray &data);
 
       /**
        * Signs and encrypts a message before sending it to a sepecific peer
        * @param to the peer to send it to
        * @param data the message to send
        */
-      virtual inline void VerifiableSend(const Connections::Id &to,
-          const QByteArray &data)
-      {
-        QByteArray msg = data + GetKey()->Sign(data);
-        GetOverlay()->SendNotification(to, "Session::Data", msg);
-      }
+      void VerifiableSend(const Connections::Id &to,
+          const QByteArray &data);
 
       /**
        * Returns the data to be sent during this round
@@ -235,7 +249,12 @@ namespace Anonymity {
       /**
        * Returns the underlyign network
        */
-      QSharedPointer<ClientServer::Overlay> &GetOverlay() { return m_overlay; }
+      QSharedPointer<ClientServer::Overlay> GetOverlay() { return m_overlay; }
+
+      /**
+       * Returns the underlyign network
+       */
+      QSharedPointer<ClientServer::Overlay> GetOverlay() const { return m_overlay; }
 
       static constexpr float PERCENT_ACTIVE = -1.0;
 
@@ -275,6 +294,7 @@ namespace Anonymity {
       QVector<int> m_empty_list;
       bool m_interrupted;
       QWeakPointer<Round> m_shared;
+      QByteArray m_header;
   };
 
   inline QDebug operator<<(QDebug dbg, const QSharedPointer<Round> &round)

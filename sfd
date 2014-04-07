@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="131" failures="0" disabled="0" errors="0" time="0" name="AllTests">
+  <testsuite name="Address" tests="3" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Basic" status="notrun" time="0" classname="Address" />
+    <testcase name="Buffer" status="notrun" time="0" classname="Address" />
+    <testcase name="Tcp" status="notrun" time="0" classname="Address" />
+  </testsuite>
+  <testsuite name="Base64" tests="1" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="basic" status="notrun" time="0" classname="Base64" />
+  </testsuite>
+  <testsuite name="BlogDropUtils" tests="2" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="HashedGeneratorInteger" status="notrun" time="0" classname="BlogDropUtils" />
+    <testcase name="HashedGeneratorCppEC" status="notrun" time="0" classname="BlogDropUtils" />
+  </testsuite>
+  <testsuite name="Connection" tests="6" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="SingleConnect" status="notrun" time="0" classname="Connection" />
+    <testcase name="SimultaneousConnect" status="notrun" time="0" classname="Connection" />
+    <testcase name="SimultaneousDisconnect" status="notrun" time="0" classname="Connection" />
+    <testcase name="Disconnect" status="notrun" time="0" classname="Connection" />
+    <testcase name="Reconnect" status="notrun" time="0" classname="Connection" />
+    <testcase name="Timeout" status="notrun" time="0" classname="Connection" />
+  </testsuite>
+  <testsuite name="Crypto" tests="32" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="RngSpeedTest1024" status="notrun" time="0" classname="Crypto" />
+    <testcase name="RngSpeedTest2048" status="notrun" time="0" classname="Crypto" />
+    <testcase name="RngSpeedTest4096" status="notrun" time="0" classname="Crypto" />
+    <testcase name="RngSpeedTest8192" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DSASignSpeedTest" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DSAVerifySpeedTest" status="notrun" time="0" classname="Crypto" />
+    <testcase name="RSASignSpeedTest" status="notrun" time="0" classname="Crypto" />
+    <testcase name="RSAVerifySpeedTest" status="notrun" time="0" classname="Crypto" />
+    <testcase name="RsaKey" status="notrun" time="0" classname="Crypto" />
+    <testcase name="RsaKeySerialization" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DsaKey" status="notrun" time="0" classname="Crypto" />
+    <testcase name="pDsaKeySerialization" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DiffieHellman" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DSAEncrypt" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DSASeriesEncrypt" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DsaSanityCheck" status="notrun" time="0" classname="Crypto" />
+    <testcase name="LRSTest" status="notrun" time="0" classname="Crypto" />
+    <testcase name="NeffShuffle" status="notrun" time="0" classname="Crypto" />
+    <testcase name="NeffDataShuffle" status="notrun" time="0" classname="Crypto" />
+    <testcase name="HashTest" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DecryptSingleThreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="ShufflePrimitivesSingleThreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="PublicKeySwapSingleThreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="CryptoTextSwapSingleThreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="MultipleCryptoTextSwapSingleThreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="SoMuchEvilSingleThreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="DecryptMultithreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="ShufflePrimitivesMultithreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="PublicKeySwapMultithreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="CryptoTextSwapMultithreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="MultipleCryptoTextSwapMultithreaded" status="notrun" time="0" classname="Crypto" />
+    <testcase name="SoMuchEvilMultithreaded" status="notrun" time="0" classname="Crypto" />
+  </testsuite>
+  <testsuite name="EdgeTest" tests="3" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="BufferBasic" status="notrun" time="0" classname="EdgeTest" />
+    <testcase name="BufferFail" status="notrun" time="0" classname="EdgeTest" />
+    <testcase name="TcpFail" status="notrun" time="0" classname="EdgeTest" />
+  </testsuite>
+  <testsuite name="Id" tests="4" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Basic" status="notrun" time="0" classname="Id" />
+    <testcase name="Serialization" status="notrun" time="0" classname="Id" />
+    <testcase name="InvalidString" status="notrun" time="0" classname="Id" />
+    <testcase name="Compare" status="notrun" time="0" classname="Id" />
+  </testsuite>
+  <testsuite name="Integer" tests="6" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Basic" status="notrun" time="0" classname="Integer" />
+    <testcase name="Null" status="notrun" time="0" classname="Integer" />
+    <testcase name="Copy" status="notrun" time="0" classname="Integer" />
+    <testcase name="InvalidString" status="notrun" time="0" classname="Integer" />
+    <testcase name="Pow" status="notrun" time="0" classname="Integer" />
+    <testcase name="Int32" status="notrun" time="0" classname="Integer" />
+  </testsuite>
+  <testsuite name="KeyShare" tests="1" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Base" status="notrun" time="0" classname="KeyShare" />
+  </testsuite>
+  <testsuite name="Overlay" tests="3" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Servers" status="notrun" time="0" classname="Overlay" />
+    <testcase name="ClientsServer" status="notrun" time="0" classname="Overlay" />
+    <testcase name="ClientsServers" status="notrun" time="0" classname="Overlay" />
+  </testsuite>
+  <testsuite name="Random" tests="5" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="BaseRandomTest" status="notrun" time="0" classname="Random" />
+    <testcase name="BaseSeededRandomTest" status="notrun" time="0" classname="Random" />
+    <testcase name="CryptoRandomTest" status="notrun" time="0" classname="Random" />
+    <testcase name="CryptoRandomSeedTest" status="notrun" time="0" classname="Random" />
+    <testcase name="Integer" status="notrun" time="0" classname="Random" />
+  </testsuite>
+  <testsuite name="Rpc" tests="1" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="HelloWorld" status="notrun" time="0" classname="Rpc" />
+  </testsuite>
+  <testsuite name="Serialization" tests="6" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Integers" status="notrun" time="0" classname="Serialization" />
+    <testcase name="BitsRequired" status="notrun" time="0" classname="Serialization" />
+    <testcase name="WriteBitsEasy" status="notrun" time="0" classname="Serialization" />
+    <testcase name="WriteBitsHard" status="notrun" time="0" classname="Serialization" />
+    <testcase name="ReadBitsEasy" status="notrun" time="0" classname="Serialization" />
+    <testcase name="ReadBitsHard" status="notrun" time="0" classname="Serialization" />
+  </testsuite>
+  <testsuite name="Check" tests="1" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Check" status="run" time="0" classname="Check" Test="Checks" />
+  </testsuite>
+  <testsuite name="Session" tests="3" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Servers" status="notrun" time="0" classname="Session" />
+    <testcase name="ClientsServer" status="notrun" time="0" classname="Session" />
+    <testcase name="ClientsServers" status="notrun" time="0" classname="Session" />
+  </testsuite>
+  <testsuite name="Settings" tests="3" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Basic" status="notrun" time="0" classname="Settings" />
+    <testcase name="Invalid" status="notrun" time="0" classname="Settings" />
+    <testcase name="WebServer" status="notrun" time="0" classname="Settings" />
+  </testsuite>
+  <testsuite name="Time" tests="6" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="CheckRealTime" status="notrun" time="0" classname="Time" />
+    <testcase name="CheckVirtualTime" status="notrun" time="0" classname="Time" />
+    <testcase name="CheckTimerEventRealIncreasing" status="notrun" time="0" classname="Time" />
+    <testcase name="CheckTimerEventRealDecreasing" status="notrun" time="0" classname="Time" />
+    <testcase name="CheckTimerEventVirtual" status="notrun" time="0" classname="Time" />
+    <testcase name="Verify_46_Hack" status="notrun" time="0" classname="Time" />
+  </testsuite>
+  <testsuite name="Triple" tests="1" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="Basic" status="notrun" time="0" classname="Triple" />
+  </testsuite>
+  <testsuite name="BlogDropProof/BlogDropProofTest" tests="20" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="IntegerElGamalServer/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="IntegerElGamalServer/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECElGamalServer/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECElGamalServer/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppIntegerClientProof/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppIntegerClientProof/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECClientProof/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECClientProof/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppIntegerElGamalAuthorProof/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppIntegerElGamalAuthorProof/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECElGamalAuthorProof/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECElGamalAuthorProof/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppIntegerElGamalEndToEnd/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppIntegerElGamalEndToEnd/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECElGamalEndToEnd/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECElGamalEndToEnd/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="IntegerHashingEndToEnd/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="IntegerHashingEndToEnd/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECHashingEndToEnd/0" value_param="true" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+    <testcase name="CppECHashingEndToEnd/1" value_param="false" status="notrun" time="0" classname="BlogDropProof/BlogDropProofTest" />
+  </testsuite>
+  <testsuite name="BlogDrop/BlogDropTest" tests="24" failures="0" disabled="0" errors="0" time="0">
+    <testcase name="PlaintextEmpty/0" value_param="16-byte object &lt;C0-99 A6-01 00-00 00-00 80-59 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextEmpty/1" value_param="16-byte object &lt;70-5E A6-01 00-00 00-00 10-8F A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextEmpty/2" value_param="16-byte object &lt;30-97 A6-01 00-00 00-00 40-4A A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextEmpty/3" value_param="16-byte object &lt;C0-52 A6-01 00-00 00-00 A0-52 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextShort/0" value_param="16-byte object &lt;40-AD A6-01 00-00 00-00 70-62 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextShort/1" value_param="16-byte object &lt;A0-AE A6-01 00-00 00-00 50-23 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextShort/2" value_param="16-byte object &lt;B0-9B A6-01 00-00 00-00 90-8E A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextShort/3" value_param="16-byte object &lt;70-AB A6-01 00-00 00-00 90-3A A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextRandom/0" value_param="16-byte object &lt;A0-D2 A6-01 00-00 00-00 D0-BD A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextRandom/1" value_param="16-byte object &lt;90-B7 A6-01 00-00 00-00 10-69 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextRandom/2" value_param="16-byte object &lt;D0-CF A6-01 00-00 00-00 F0-95 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="PlaintextRandom/3" value_param="16-byte object &lt;70-93 A6-01 00-00 00-00 F0-A4 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Keys/0" value_param="16-byte object &lt;A0-DB A6-01 00-00 00-00 D0-DC A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Keys/1" value_param="16-byte object &lt;90-66 A6-01 00-00 00-00 C0-BE A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Keys/2" value_param="16-byte object &lt;90-BC A6-01 00-00 00-00 60-AF A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Keys/3" value_param="16-byte object &lt;80-D7 A6-01 00-00 00-00 B0-D9 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="KeySet/0" value_param="16-byte object &lt;80-F8 A6-01 00-00 00-00 C0-5E A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="KeySet/1" value_param="16-byte object &lt;30-CD A6-01 00-00 00-00 70-BA A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="KeySet/2" value_param="16-byte object &lt;20-FB A6-01 00-00 00-00 80-AF A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="KeySet/3" value_param="16-byte object &lt;80-CD A6-01 00-00 00-00 10-5F A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Benchmark/0" value_param="16-byte object &lt;E0-C6 A6-01 00-00 00-00 80-FA A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Benchmark/1" value_param="16-byte object &lt;F0-E3 A6-01 00-00 00-00 C0-FF A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Benchmark/2" value_param="16-byte object &lt;30-96 A6-01 00-00 00-00 80-96 A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+    <testcase name="Benchmark/3" value_param="16-byte object &lt;90-DF A6-01 00-00 00-00 90-CF A6-01 00-00 00-00&gt;" status="notrun" time="0" classname="BlogDrop/BlogDropTest" />
+  </testsuite>
+</testsuites>
