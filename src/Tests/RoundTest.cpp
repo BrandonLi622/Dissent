@@ -1,8 +1,10 @@
 #include "DissentTest.hpp"
 #include "OverlayTest.hpp"
 #include "SessionTest.hpp"
+#include "SFT/SFTNullRound.hpp"
 
 namespace Dissent {
+
 namespace Tests {
   void TestRoundBasic(CreateRound create_round)
   {
@@ -38,6 +40,11 @@ namespace Tests {
   TEST(CSDCNetRound, Basic)
   {
     TestRoundBasic(TCreateDCNetRound<CSDCNetRound, NullRound>);
+  }
+
+  TEST(SFTNullRound, Basic)
+  {
+      TestRoundBasic(TCreateRound<SFT::SFTNullRound>);
   }
 }
 }

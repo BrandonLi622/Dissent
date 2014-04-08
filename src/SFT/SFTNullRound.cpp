@@ -17,12 +17,13 @@ namespace SFT {
       else if (clients.Contains(ident.GetId())) {qDebug() <<  "SFT is a client";}
       else {qDebug() << "SFT is neither";}
 
-      //this->sftViewManager = new SFTViewManager(servers, ident);
-
       this->sftViewManager = new SFTViewManager(servers, ident);
+      this->sftMessageManager = new SFTMessageManager(this);
 
       qDebug() << "SFTNullRound constructor IS WORKING " << ident.GetKey();
   }
+
+
 
   void SFTNullRound::OnStart()
   {
@@ -57,32 +58,42 @@ namespace SFT {
 
   }
 
-  void SFTNullRound::ClientOnStart()
+  void SFTNullRound::broadcastToClients(QVariantMap map)
   {
-      QByteArray msg;
-      QVariantMap map;
-      map.insert("Type", 3);
       QVariant variant(map);
       QByteArray data;
       QDataStream stream(&data,QIODevice::WriteOnly);
       stream << variant;
+      QByteArray msg;
       msg.append(data);
       msg.prepend(127);
-      GetOverlay()->Broadcast("SessionData", msg);
+      GetOverlay()->Broadcast("SessionData", msg); //TODO: Why can't I broadcast to clients?
+  }
+
+  void SFTNullRound::broadcastToServers(QVariantMap map)
+  {
+      QVariant variant(map);
+      QByteArray data;
+      QDataStream stream(&data,QIODevice::WriteOnly);
+      stream << variant;
+      QByteArray msg;
+      msg.append(data);
+      msg.prepend(127);
+      GetOverlay()->BroadcastToServers("SessionData", msg);
+  }
+
+  void SFTNullRound::ClientOnStart()
+  {
+      QVariantMap map;
+      map.insert("Type", 3);
+      broadcastToClients(map);
   }
 
   void SFTNullRound::ServerOnStart()
   {
-      QByteArray msg;
       QVariantMap map;
       map.insert("Type", "Server Message");
-      QVariant variant(map);
-      QByteArray data;
-      QDataStream stream(&data,QIODevice::WriteOnly);
-      stream << variant;
-      msg.append(data);
-      msg.prepend(127);
-      GetOverlay()->Broadcast("SessionData", msg);
+      broadcastToClients(map);
   }
 
 
@@ -106,9 +117,6 @@ namespace SFT {
     {
         ClientProcessPacket(from, data);
     }
-
-
-
 
 
     // 1) Instead of checking for duplicates, I should look at what type of message it is and do the appropriate action

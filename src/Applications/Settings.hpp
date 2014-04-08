@@ -80,7 +80,7 @@ namespace Applications {
       /**
        * Enable demo mode for evaluation / demo purposes
        */
-      AuthFactory::AuthType AuthMode;
+      //AuthFactory::AuthType AuthMode;
 
       /**
        * The type of anonymity session / round to construct

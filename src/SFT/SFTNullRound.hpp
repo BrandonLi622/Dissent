@@ -11,6 +11,8 @@ namespace Anonymity {
 }
 
 namespace SFT {
+  class SFTViewManager;
+  class SFTMessageManager;
   /**
    * A simple Dissent exchange.  Just broadcasts everyones message to everyone else
    */
@@ -34,6 +36,15 @@ namespace SFT {
           const QSharedPointer<ClientServer::Overlay> &overlay,
           Messaging::GetDataCallback &get_data);
 
+
+
+      enum RoundPhase {
+          Collection,
+          ClientAttendance,
+          ViewChangeVoting,
+          ExchangeCiphers
+      };
+
       /**
        * Destructor
        */
@@ -50,6 +61,14 @@ namespace SFT {
       virtual void ClientProcessPacket(const Connections::Id &from, const QByteArray &data);
       virtual void ServerProcessPacket(const Connections::Id &from, const QByteArray &data);
 
+      quint32 messageLength;
+      SFTViewManager *sftViewManager;
+      SFTMessageManager *sftMessageManager;
+      bool isServer; //If false, it is a client. Will seperate out into 2 class later
+
+      void broadcastToServers(QVariantMap map);
+      void broadcastToClients(QVariantMap map);
+
     protected:
       /**
        * Called when the NullRound is started
@@ -64,10 +83,8 @@ namespace SFT {
        */
       QVector<QByteArray> m_received;
       int m_msgs;
-      bool isServer; //If false, it is a client. Will seperate out into 2 class later
 
-      SFTViewManager *sftViewManager;
-
+      int messageSize = 3; //Could've picked anything for here
 
   };
 }

@@ -27,11 +27,12 @@ public:
                    double quorumRatio = 2.0/3.0);
 
     int getCurrentViewNum();
-    //const Identity::Roster getCurrentView();
     bool inCurrentView(const Connections::Id &nodeId);
+    int getViewSize();
+
 
     void startViewChangeProposal(int viewNum);
-    int addViewChangeVote(bool vote);
+    int addViewChangeVote(int viewNum, const Connections::Id &voter);
     bool setNewView(int viewNum);
 
     QList<int> proposeViewChanges(int n);
@@ -48,7 +49,7 @@ private:
 
     double quorumRatio;
 
-    QVariantMap *viewProposals;
+    QHash<int, QVariantMap> *viewChangeProposals;
 
     QVector<Connections::Id> *downServers;
 

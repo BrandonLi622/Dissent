@@ -15,7 +15,7 @@ SFTViewManager::SFTViewManager(const Identity::Roster &servers,
     this->currentView = new QVector<bool>();
     setNewView(this->viewNum);
 
-    this->viewProposals = new QVariantMap();
+    this->viewChangeProposals = new QHash<int, QVariantMap>();
 
     qDebug() << "SFTViewManager constructor IS WORKING" << *(this->currentView);
     //qDebug() << this->currentView;
@@ -78,23 +78,40 @@ bool SFTViewManager::tooFewServers()
 void SFTViewManager::startViewChangeProposal(int viewNum)
 {
     //TODO: Maybe start some sort of timer
+    this->viewNum = viewNum;
 }
 
-int SFTViewManager::addViewChangeVote(bool vote)
+int SFTViewManager::addViewChangeVote(int viewNum, const Connections::Id &voter)
 {
-    if (vote)
-    {
-        this->numApproves += 1;
-    }
+    int serverID = voter.GetInteger().GetInt32();
+    QVariantMap countMap = viewChangeProposals->value(viewNum, QVariantMap()); //want it to default to 0
 
-    if (this->numApproves >= quorumRatio * numServers)
-    {
-        //TODO: What if this fails?
-        setNewView(this->proposedNewView);
-        return this->viewNum;
-    }
+    int count = countMap.value("Count", 0).toInt();
+    QList<QVariant> voters = countMap.value("Voters", QList<QVariant>()).toList();
 
-    return -1;
+    //Don't allow double counting
+    if (voters.contains(serverID))
+    {
+        qDebug() << "Redundant voters " << voters;
+        return -1;
+    }
+    qDebug() << "COUNT: " << (count + 1);
+
+    voters.append(serverID);
+    countMap.insert("Count", count + 1);
+    countMap.insert("Voters", voters);
+
+    viewChangeProposals->insert(viewNum, countMap);
+
+    //TODO: should move out this proportion somewhere else...
+    if ((count + 1) >= 2.0 * this->m_servers.Count() / 3.0 && viewNum > getCurrentViewNum())
+    {
+        qDebug() << "Changed view";
+        setNewView(viewNum);
+        return viewNum;
+        //startRound(); //Need to discard everything and start a new round when the view changes
+    }
+    return -1; //Means view did not change
 }
 
 bool SFTViewManager::setNewView(int viewNum)
@@ -106,6 +123,19 @@ bool SFTViewManager::setNewView(int viewNum)
     //TODO: Need to calculate the actual view
 
     return true;
+}
+
+int SFTViewManager::getViewSize()
+{
+    int count = 0;
+    for (int i = 0; i < this->currentView->count(); i++)
+    {
+        if (this->currentView->at(i))
+        {
+            count++;
+        }
+    }
+    return count;
 }
 
 QVector<bool> *SFTViewManager::calcServerMembership(int viewNum)
