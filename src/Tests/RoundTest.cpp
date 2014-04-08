@@ -44,7 +44,24 @@ namespace Tests {
 
   TEST(SFTNullRound, Basic)
   {
-      TestRoundBasic(TCreateRound<SFT::SFTNullRound>);
+      CreateRound create_round = TCreateRound<SFT::SFTNullRound>;
+      //TestRoundBasic(TCreateRound<SFT::SFTNullRound>);
+      Timer::GetInstance().UseVirtualTime();
+      ConnectionManager::UseTimer = false;
+          OverlayNetwork net = ConstructOverlay(3, 10);
+          VerifyStoppedNetwork(net);
+          StartNetwork(net);
+          VerifyNetwork(net);
+
+          Sessions sessions = BuildSessions(net, create_round);
+          qDebug() << "Starting sessions...";
+          StartSessions(sessions);
+          SendTest(sessions);
+
+          StopSessions(sessions);
+          StopNetwork(sessions.network);
+          VerifyStoppedNetwork(sessions.network);
+          ConnectionManager::UseTimer = true;
   }
 }
 }

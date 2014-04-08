@@ -3,19 +3,18 @@
 namespace Dissent{
 namespace SFT {
 SFTViewManager::SFTViewManager(const Identity::Roster &servers,
-                               const Identity::PrivateIdentity &ident,
                                double quorumRatio) :
-    m_servers(servers),
-    m_ident(ident)
+    m_servers(servers)
 {
     this->downServers = new QVector<Connections::Id>();
     this->numServers = m_servers.Count();
     this->quorumRatio = quorumRatio;
     this->viewNum = 0;
     this->currentView = new QVector<bool>();
+    this->viewChangeProposals = new QHash<int, QVariantMap>();
+
     setNewView(this->viewNum);
 
-    this->viewChangeProposals = new QHash<int, QVariantMap>();
 
     qDebug() << "SFTViewManager constructor IS WORKING" << *(this->currentView);
     //qDebug() << this->currentView;
@@ -38,7 +37,23 @@ bool SFTViewManager::addFailedServer(const Connections::Id &nodeId)
     return this->inCurrentView(nodeId);
 }
 
-int SFTViewManager::proposeViewChange(int minViewNum)
+QVector<Connections::Id> SFTViewManager::getCurrentServers()
+{
+    //TODO: How long will this value persist?
+    QVector<Connections::Id> connections = QVector<Connections::Id>();
+
+    for (int i = 0; i < this->currentView->count(); i++)
+    {
+        if (this->currentView->at(i))
+        {
+            connections.append(this->m_servers.GetId(i));
+        }
+    }
+
+    return connections;
+}
+
+int SFTViewManager::nextGoodView(int minViewNum)
 {
     QVector<bool> *viewMembership = calcServerMembership(minViewNum);
     for (int j = 0; j < this->downServers->count(); j++)
@@ -49,7 +64,7 @@ int SFTViewManager::proposeViewChange(int minViewNum)
         //If any of the down servers are in a particular view, try the next view
         if (viewMembership->at(index))
         {
-            proposeViewChange(minViewNum + 1);
+            nextGoodView(minViewNum + 1);
         }
     }
 
@@ -57,29 +72,13 @@ int SFTViewManager::proposeViewChange(int minViewNum)
     return minViewNum;
 }
 
-QList<int> SFTViewManager::proposeViewChanges(int n)
-{
-    QList<int> *proposedChanges = new QList<int>();
-    int minViewNum = this->viewNum + 1; //View change must be at least 1 greater than current view
-    for (int i = 0; i < n; i++)
-    {
-        int proposal = proposeViewChange(minViewNum);
-        proposedChanges->append(proposal);
-        minViewNum = proposal + 1;
-    }
-    return *proposedChanges;
-}
+
 
 bool SFTViewManager::tooFewServers()
 {
     return this->downServers->count() >= 2.0 * this->numServers / 3.0;
 }
 
-void SFTViewManager::startViewChangeProposal(int viewNum)
-{
-    //TODO: Maybe start some sort of timer
-    this->viewNum = viewNum;
-}
 
 int SFTViewManager::addViewChangeVote(int viewNum, const Connections::Id &voter)
 {
@@ -119,8 +118,7 @@ bool SFTViewManager::setNewView(int viewNum)
     delete this->currentView;
     this->viewNum = viewNum;
     this->currentView = calcServerMembership(viewNum);
-
-    //TODO: Need to calculate the actual view
+    this->viewChangeProposals->clear(); //TODO: Should this be cleared?
 
     return true;
 }
@@ -163,6 +161,28 @@ QVector<bool> *SFTViewManager::calcServerMembership(int viewNum)
 
     return viewMembership;
 }
+
+
+/*
+void SFTViewManager::startViewChangeProposal(int viewNum)
+{
+    //TODO: Maybe start some sort of timer
+    this->viewNum = viewNum;
+}*/
+
+/*
+QList<int> SFTViewManager::proposeViewChanges(int n)
+{
+    QList<int> *proposedChanges = new QList<int>();
+    int minViewNum = this->viewNum + 1; //View change must be at least 1 greater than current view
+    for (int i = 0; i < n; i++)
+    {
+        int proposal = proposeViewChange(minViewNum);
+        proposedChanges->append(proposal);
+        minViewNum = proposal + 1;
+    }
+    return *proposedChanges;
+}*/
 
 //Maybe scrap this if we don't actually have access to the PublicIdentity's
 /*

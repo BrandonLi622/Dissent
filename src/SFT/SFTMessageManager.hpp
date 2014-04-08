@@ -3,11 +3,14 @@
 
 #include <QVariant>
 #include "Connections/Id.hpp"
+#include "SFT/SFTViewManager.hpp"
 #include "SFT/SFTNullRound.hpp"
+
 
 namespace Dissent {
 namespace SFT {
 class SFTNullRound;
+class SFTViewManager;
 
 class SFTMessageManager : public QObject
 {
@@ -36,18 +39,25 @@ public:
       ClientAttendance
     };
 
-    SFTMessageManager(SFT::SFTNullRound *round);
+    SFTMessageManager(Connections::Id localId,
+                      const Identity::Roster &clients,
+                      const Identity::Roster &servers,
+                      SFT::SFTViewManager *sftManager);
 
     //Generate maps for me to send
     QVariantMap genViewChangeProposal(qint32 viewNum);
     QVariantMap genClientViewChangeNotification(qint32 viewNum);
     QVariantMap genDecryption(qint32 viewNum);
+    QVariantMap genClientMessage(qint32 viewNum, QByteArray data);
 
     //Working with message logic
     QByteArray encryptionKey(qint32 serverID, qint32 clientID, qint32 keyLength, qint32 numClients);
     QByteArray xorBytes(QByteArray a1, QByteArray a2);
     QByteArray createCipher();
     QByteArray getDecrypted();
+
+    //Sending messages
+    void sendViewChangeProposal(qint32 viewNum);
 
     //Receiving messages
     void switchServerMessage(QVariantMap map, const Connections::Id &from);
@@ -60,15 +70,26 @@ public:
     void startViewVoting();
 
     //Client functions
-    QByteArray encryptClientMessage(int clientID, QByteArray data); //Above were mostly server functions
-    QByteArray insertInSlot(QString msg);
-    //TODO: Need something for clients to send messages
+    void clientRoundMessageSend(QString msg);
+
+signals:
+    void sendToSingleServer(Connections::Id peer, QVariantMap map);
+    void broadcastToServers(QVariantMap map);
+    void broadcastToClients(QVariantMap map);
+
 
 private:
+    //Server functions
     void processClientMessage(QVariantMap map, const Connections::Id &from);
     void processClientList(QVariantMap map, const Connections::Id &from);
     void processViewChangeProposal(QVariantMap map, const Connections::Id &from);
     void processCipher(QVariantMap map, const Connections::Id &from);
+
+    //Client functions
+    QByteArray encryptClientMessage(int clientID, QByteArray data); //Above were mostly server functions
+    QByteArray insertInSlot(QString msg);
+    void processViewChangeNotification(QVariantMap map, const Connections::Id &from);
+    void processDecrypted(QVariantMap map);
 
     qint32 roundPhase;
     QHash<qint32, QByteArray> *receivedClientMsgs;
@@ -77,9 +98,13 @@ private:
     QList<qint32> *respondedServers;
     QList<qint32> *respondedClients;
     QList<qint32> *totalRoundClients;
-    SFT::SFTNullRound *round;
 
     int keyLength = 3;
+
+    Connections::Id localId;
+    Identity::Roster m_clients;
+    Identity::Roster m_servers;
+    SFT::SFTViewManager *sftViewManager;
 
 
 };

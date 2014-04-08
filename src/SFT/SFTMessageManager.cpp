@@ -8,9 +8,16 @@
 
 namespace Dissent{
 namespace SFT {
-SFTMessageManager::SFTMessageManager(SFT::SFTNullRound *round)
+SFTMessageManager::SFTMessageManager(Connections::Id localId,
+                                     const Identity::Roster &clients,
+                                     const Identity::Roster &servers,
+                                     SFT::SFTViewManager *sftViewManager)
+//SFTMessageManager::SFTMessageManager(SFT::SFTNullRound *round)
 {
-    this->round = round;
+    this->localId = localId;
+    this->m_clients = clients;
+    this->m_servers = servers;
+    this->sftViewManager = sftViewManager;
     this->startRound();
 }
 
@@ -27,7 +34,7 @@ void SFTMessageManager::startRound()
 void SFTMessageManager::startClientAttendance()
 {
     this->respondedServers->clear();
-    this->respondedServers->append(this->round->GetLocalId().GetInteger().GetInt32());
+    this->respondedServers->append(this->localId.GetInteger().GetInt32());
     QList<QVariant> serializedClientList = QList<QVariant>();
 
     for (int i = 0; i < this->respondedClients->count(); i++)
@@ -40,7 +47,8 @@ void SFTMessageManager::startClientAttendance()
     QVariantMap map = QVariantMap();
     map.insert("Type", this->roundPhase);
     map.insert("ClientList", QVariant(serializedClientList));
-    this->round->broadcastToServers(map);
+
+    emit this->broadcastToServers(map);
 }
 
 void SFTMessageManager::startCipherExchange()
@@ -50,7 +58,8 @@ void SFTMessageManager::startCipherExchange()
     QVariantMap map = QVariantMap();
     map.insert("Type", MessageTypes::ServerCipher);
     map.insert("Cipher", cipherText);
-    this->round->broadcastToServers(map);
+
+    emit this->broadcastToServers(map);
 }
 
 void SFTMessageManager::startViewVoting()
@@ -82,6 +91,21 @@ QVariantMap SFTMessageManager::genDecryption(int viewNum)
     map.insert("Decrypted", decrypted);
     map.insert("ViewNum", viewNum);
     return map;
+}
+
+QVariantMap SFTMessageManager::genClientMessage(qint32 viewNum, QByteArray data)
+{
+    QVariantMap map;
+    map.insert("Type", MessageTypes::ClientMessage);
+    map.insert("Message", data);
+    map.insert("ViewNum", viewNum);
+    return map;
+}
+
+void SFTMessageManager::sendViewChangeProposal(qint32 viewNum)
+{
+    QVariantMap map = genViewChangeProposal(viewNum);
+    emit this->broadcastToServers(map);
 }
 
 QByteArray SFTMessageManager::encryptionKey(int serverID, int clientID, int keyLength, int numClients)
@@ -119,9 +143,9 @@ QByteArray SFTMessageManager::insertInSlot(QString msg)
     fullMsg.append(msg); //Add in my message;
 
     //The index of this persons slot
-    int slotNum = this->round->GetClients().GetIndex(this->round->GetLocalId());
+    int slotNum = this->m_clients.GetIndex(this->localId);
 
-    for (int i = slotNum + 1; i < this->round->GetClients().Count(); i++)
+    for (int i = slotNum + 1; i < this->m_clients.Count(); i++)
     {
         //null values for other people's
         for (int j = 0; j < this->keyLength; j++)
@@ -140,13 +164,31 @@ QByteArray SFTMessageManager::insertInSlot(QString msg)
 QByteArray SFTMessageManager::encryptClientMessage(int clientID, QByteArray data)
 {
     QByteArray xored = data;
-    for (int i = 0; i < this->round->GetServers().Count(); i++)
+    QVector<Connections::Id> servers = this->sftViewManager->getCurrentServers();
+    //Should only encrypt based on who is actually in the round!!
+    for (int i = 0; i < servers.count(); i++)
     {
-        int serverID = this->round->GetServers().GetId(i).GetInteger().GetInt32();
-        QByteArray key = encryptionKey(serverID, clientID, this->keyLength, this->round->GetServers().Count());
+        int serverID = servers.at(i).GetInteger().GetInt32();
+        //This should really be the number of clients * keylength
+        QByteArray key = encryptionKey(serverID, clientID, this->m_clients.Count() * this->keyLength, servers.count());
         xored = xorBytes(xored, key);
     }
     return xored;
+}
+
+void SFTMessageManager::clientRoundMessageSend(QString msg)
+{
+    QString sub = msg.mid(0, this->keyLength); //Truncate the message to what we can actually send
+    QByteArray insertedMsg = insertInSlot(sub);
+    QByteArray encrypted = encryptClientMessage(this->localId.GetInteger().GetInt32(), insertedMsg);
+    QVariantMap map = genClientMessage(this->sftViewManager->getCurrentViewNum(), encrypted); //TODO: Better hope this value is correct
+
+    //Right now it just picks a random server to send to
+    srand (time(NULL));
+    int random = rand() % this->sftViewManager->getViewSize();
+    Connections::Id server = this->sftViewManager->getCurrentServers().at(random);
+
+    emit this->sendToSingleServer(server, map);
 }
 
 //Utility
@@ -183,14 +225,14 @@ QByteArray SFTMessageManager::createCipher()
         xored = xorBytes(xored, receivedClientMsgs->value(id));
     }
 
-    int thisID = this->round->GetLocalId().GetInteger().GetInt32();
+    int thisID = this->localId.GetInteger().GetInt32();
 
     //Assuming fixed length messages
     //Gets the encryption key for all of the clients
     for (int i = 0; i < totalRoundClients->count(); i++)
     {
         int clientID = totalRoundClients->at(i);
-        QByteArray key = encryptionKey(thisID, clientID, this->round->messageLength, int(this->round->GetClients().Count()));
+        QByteArray key = encryptionKey(thisID, clientID, this->keyLength, int(this->m_clients.Count()));
 
         xored = xorBytes(xored, key);
     }
@@ -213,7 +255,8 @@ QByteArray SFTMessageManager::getDecrypted()
 
 void SFTMessageManager::switchServerMessage(QVariantMap map, const Connections::Id &from)
 {
-    qDebug() << from;
+    qDebug() << "Receiving message at server from " << from;
+    qDebug() << map;
 
     if (!map.keys().contains("Type"))
     {
@@ -223,14 +266,22 @@ void SFTMessageManager::switchServerMessage(QVariantMap map, const Connections::
 
     if (map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::ClientMessage)
     {
+        qDebug() << "Received a client message";
         processClientMessage(map, from);
     }
     else if (map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::ViewChangeVote)
     {
+        qDebug() << "Received a view change vote message";
         processViewChangeProposal(map, from);
+    }
+    else if (map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::ClientAttendance)
+    {
+        qDebug() << "Received a client attendance message";
+        processClientList(map, from);
     }
     else if (map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::ServerCipher)
     {
+        qDebug() << "Received a server cipher message";
         processCipher(map, from);
     }
     else
@@ -242,7 +293,8 @@ void SFTMessageManager::switchServerMessage(QVariantMap map, const Connections::
 
 void SFTMessageManager::switchClientMessage(QVariantMap map, const Connections::Id &from)
 {
-    qDebug() << from;
+    qDebug() << "Receiving message at client from " << from;
+    qDebug() << map;
 
     if (!map.keys().contains("Type"))
     {
@@ -252,7 +304,15 @@ void SFTMessageManager::switchClientMessage(QVariantMap map, const Connections::
 
     if (map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::ViewChangeNotification)
     {
-        qDebug() << "hello";
+        qDebug() << "Received a view change notification message";
+        processViewChangeNotification(map, from);
+    }
+
+    else if (map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::Decrypted)
+    {
+        qDebug() << "Received the decrypted message";
+        //TODO: Need to figure out what to do here
+        processDecrypted(map);
     }
     else
     {
@@ -263,7 +323,7 @@ void SFTMessageManager::switchClientMessage(QVariantMap map, const Connections::
 
 void SFTMessageManager::processCipher(QVariantMap map, const Connections::Id &from)
 {
-    if (!this->round->sftViewManager->inCurrentView(from))
+    if (!this->sftViewManager->inCurrentView(from))
     {
         qDebug() << "Ignore all ciphertexts from people not in the round";
     }
@@ -279,12 +339,12 @@ void SFTMessageManager::processCipher(QVariantMap map, const Connections::Id &fr
     }
     qDebug() << "Received cipher";
 
-    if (respondedServers->length() == this->round->sftViewManager->getViewSize())
+    if (respondedServers->length() == this->sftViewManager->getViewSize())
     {
         //DONE WITH THE ROUND!
         //Should now decrypt and send back to clients
-        QVariantMap map = genDecryption(this->round->sftViewManager->getCurrentViewNum());
-        this->round->broadcastToClients(map);
+        QVariantMap map = genDecryption(this->sftViewManager->getCurrentViewNum());
+        emit this->broadcastToClients(map);
         this->startRound();  //TODO: This is going to be a problem for synchronization...
     }
     /*
@@ -302,12 +362,13 @@ void SFTMessageManager::processViewChangeProposal(QVariantMap map, const Connect
     int viewNum = map.value("ViewNum").toInt();
 
     //Means the view changed
-    int viewChangeCode = this->round->sftViewManager->addViewChangeVote(viewNum, from);
+    int viewChangeCode = this->sftViewManager->addViewChangeVote(viewNum, from);
     if (viewChangeCode > -1)
     {
         //Should notify clients somehow
         QVariantMap map = this->genClientViewChangeNotification(viewChangeCode);
-        this->round->broadcastToClients(map);
+
+        emit this->broadcastToClients(map);
         this->startRound();
     }
 }
@@ -324,7 +385,7 @@ void SFTMessageManager::processClientList(QVariantMap map, const Connections::Id
     }
     this->respondedServers->append(from.GetInteger().GetInt32());
 
-    if (this->respondedServers->count() == this->round->GetServers().Count())
+    if (this->respondedServers->count() == this->m_servers.Count())
     {
         //Then we've got all of the clients
     }
@@ -338,13 +399,13 @@ void SFTMessageManager::processClientMessage(QVariantMap map, const Connections:
         return;
     }
 
-    int viewNum = map.value("ViewNum").toUInt();
+    int viewNum = map.value("ViewNum").toInt();
     QByteArray msg = map.value("Message").toByteArray();
 
     int clientID = from.GetInteger().GetInt32();
     receivedClientMsgs->insert(clientID, msg);
 
-    if (this->round->sftViewManager->getCurrentViewNum() != viewNum)
+    if (this->sftViewManager->getCurrentViewNum() != viewNum)
     {
         qDebug() << "Wrong view number!";
         return;
@@ -354,6 +415,25 @@ void SFTMessageManager::processClientMessage(QVariantMap map, const Connections:
     {
         this->respondedClients->append(clientID);
     }
+}
+
+void SFTMessageManager::processViewChangeNotification(QVariantMap map, const Connections::Id &from)
+{
+    if (!this->m_servers.Contains(from))
+    {
+        qDebug() << "View change notification invalid. Not from a server in the round";
+        return;
+    }
+
+    int viewNum = map.value("ViewNum").toInt();
+    this->sftViewManager->setNewView(viewNum);
+}
+
+void SFTMessageManager::processDecrypted(QVariantMap map)
+{
+    QByteArray b = map.value("Decrypted").toByteArray();
+    QString finalOutput = QString(b);
+    qDebug() << map << b << finalOutput;
 }
 
 

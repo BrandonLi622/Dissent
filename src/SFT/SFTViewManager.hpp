@@ -23,38 +23,35 @@ class SFTViewManager : public QObject
 
 public:
     SFTViewManager(const Identity::Roster &servers,
-                   const Identity::PrivateIdentity &ident,
                    double quorumRatio = 2.0/3.0);
 
+    //Accessor / State information
     int getCurrentViewNum();
     bool inCurrentView(const Connections::Id &nodeId);
     int getViewSize();
+    bool tooFewServers(); //If this is true then we should kill the round
+    QVector<Connections::Id> getCurrentServers();
 
-
-    void startViewChangeProposal(int viewNum);
+    bool addFailedServer(const Connections::Id &nodeId); //returns true if we need a view change
+    int nextGoodView(int minViewNum); //Starting from @minViewNum give a view that does not contain any bad servers
     int addViewChangeVote(int viewNum, const Connections::Id &voter);
     bool setNewView(int viewNum);
 
-    QList<int> proposeViewChanges(int n);
 
-    bool tooFewServers(); //If this is true then we should kill the round
-    bool addFailedServer(const Connections::Id &nodeId); //returns true if we need a view change
+    //void startViewChangeProposal(int viewNum);
+    //QList<int> proposeViewChanges(int n);
 
 private:
     int viewNum;
     QVector<bool> *currentView;
     int numServers;
     const Identity::Roster m_servers;
-    const Identity::PrivateIdentity m_ident;
-
-    double quorumRatio;
 
     QHash<int, QVariantMap> *viewChangeProposals;
-
     QVector<Connections::Id> *downServers;
-
-    int proposeViewChange(int minViewNum); //Starting from @minViewNum give a view that does not contain any bad servers
     QVector<bool> *calcServerMembership(int viewNum);
+
+    double quorumRatio;
 
 };
 

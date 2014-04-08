@@ -60,14 +60,17 @@ namespace SFT {
       virtual void ProcessPacket(const Connections::Id &from, const QByteArray &data);
       virtual void ClientProcessPacket(const Connections::Id &from, const QByteArray &data);
       virtual void ServerProcessPacket(const Connections::Id &from, const QByteArray &data);
+      virtual void HandleDisconnect(const Connections::Id &id);
 
       quint32 messageLength;
       SFTViewManager *sftViewManager;
       SFTMessageManager *sftMessageManager;
       bool isServer; //If false, it is a client. Will seperate out into 2 class later
 
+  public slots:
       void broadcastToServers(QVariantMap map);
       void broadcastToClients(QVariantMap map);
+      void sendToSingleServer(const Connections::Id &to, QVariantMap map); //More for client use
 
     protected:
       /**
@@ -83,9 +86,6 @@ namespace SFT {
        */
       QVector<QByteArray> m_received;
       int m_msgs;
-
-      int messageSize = 3; //Could've picked anything for here
-
   };
 }
 }
