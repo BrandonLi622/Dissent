@@ -11,7 +11,7 @@
 #include "Connections/Id.hpp"
 //#include "Identity/Group.hpp"
 
-#include "AuthFactory.hpp"
+//#include "AuthFactory.hpp"
 //#include "SessionFactory.hpp"
 
 namespace Dissent {

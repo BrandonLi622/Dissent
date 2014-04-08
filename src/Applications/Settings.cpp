@@ -1,6 +1,6 @@
 #include "Utils/Logging.hpp"
 
-#include "AuthFactory.hpp"
+//#include "AuthFactory.hpp"
 #include "Settings.hpp"
 
 using Dissent::Utils::Logging;
@@ -46,8 +46,8 @@ namespace Applications {
     QVariant endpoints = _settings->value(Param<Params::LocalEndPoints>());
     ParseUrlList("EndPoint", endpoints, LocalEndPoints);
 
-    QString auth_mode = _settings->value(Param<Params::AuthMode>(), "null").toString();
-    AuthMode = AuthFactory::GetAuthType(auth_mode);
+//    QString auth_mode = _settings->value(Param<Params::AuthMode>(), "null").toString();
+//    AuthMode = AuthFactory::GetAuthType(auth_mode);
 
     if(_settings->contains(Param<Params::LocalNodeCount>())) {
       LocalNodeCount = _settings->value(Param<Params::LocalNodeCount>()).toInt();
@@ -166,6 +166,7 @@ namespace Applications {
     }
     */
 
+    /*
     if(AuthMode == AuthFactory::INVALID) {
       _reason = "Invalid auth_mode";
       return false;
@@ -181,6 +182,7 @@ namespace Applications {
         return false;
       }
     }
+    */
 
     /*
     if(SessionType == SessionFactory::INVALID) {
@@ -266,7 +268,7 @@ namespace Applications {
     _settings->setValue(Param<Params::LocalNodeCount>(), LocalNodeCount);
     _settings->setValue(Param<Params::WebServerUrl>(), WebServerUrl);
     _settings->setValue(Param<Params::Console>(), Console);
-    _settings->setValue(Param<Params::AuthMode>(), AuthMode);
+//    _settings->setValue(Param<Params::AuthMode>(), AuthMode);
     _settings->setValue(Param<Params::Log>(), Log);
     _settings->setValue(Param<Params::Multithreading>(), Multithreading);
     QVariantList local_ids;
