@@ -13,41 +13,96 @@ namespace SFT {
     m_msgs(0)
   {
       this->isServer = false;
-      if (servers.Contains(ident.GetId())) {this->isServer = true; qDebug() << "SFT is a server";}
-      else if (clients.Contains(ident.GetId())) {qDebug() <<  "SFT is a client";}
-      else {qDebug() << "SFT is neither";}
 
+      //Why doesn't it like when I use new?
+      this->downstreamClients = QList<Connections::Id>();
+      this->upstreamServers = QList<Connections::Id>();
       this->sftViewManager = new SFTViewManager(servers);
-      this->sftMessageManager = new SFTMessageManager(this->GetLocalId(), clients, servers, sftViewManager);
+
+      Connections::ConnectionTable connTable = this->GetOverlay()->GetConnectionTable();
+
+      if (servers.Contains(ident.GetId()))
+      {
+          this->isServer = true;
+          qDebug() << "SFT is a server";
+          for (int i = 0; i < clients.Count(); i++)
+          {
+              Connections::Id client = clients.GetId(i);
+              if (connTable.GetConnection(client) != 0)
+              {
+                  this->downstreamClients.append(client);
+              }
+          }
+          qDebug() << "Client IDs: " << this->GetLocalId() << downstreamClients;
+          this->sftMessageManager = new SFTMessageManager(this->GetLocalId(), clients, servers, downstreamClients, isServer, sftViewManager);
+
+      }
+      else if (clients.Contains(ident.GetId()))
+      {
+          qDebug() << "SFT is a client";
+          for (int i = 0; i < servers.Count(); i++)
+          {
+              Connections::Id server = servers.GetId(i);
+              if (connTable.GetConnection(server) != 0)
+              {
+                  this->upstreamServers.append(server);
+              }
+          }
+          qDebug() << "Server ID: " << this->GetLocalId() << upstreamServers;
+          this->sftMessageManager = new SFTMessageManager(this->GetLocalId(), clients, servers, upstreamServers, isServer, sftViewManager);
+
+      }
+      else
+      {
+          qDebug() << "SFT is neither";
+      }
+
 
       qDebug() << "Signals connected";
-      connect(this->sftMessageManager, SIGNAL(broadcastToClients(QVariantMap)), this, SLOT(broadcastToClients(QVariantMap)));
+      connect(this->sftMessageManager, SIGNAL(broadcastToDownstreamClients(QVariantMap)), this, SLOT(broadcastToDownstreamClients(QVariantMap)));
       connect(this->sftMessageManager, SIGNAL(broadcastToServers(QVariantMap)), this, SLOT(broadcastToServers(QVariantMap)));
-      connect(this->sftMessageManager, SIGNAL(sendToSingleServer(Connections::Id,QVariantMap)), this, SLOT(sendToSingleServer(Connections::Id,QVariantMap)));
+      connect(this->sftMessageManager, SIGNAL(sendToSingleNode(Connections::Id,QVariantMap)), this, SLOT(sendToSingleNode(Connections::Id,QVariantMap)));
 
       qDebug() << "SFTNullRound constructor IS WORKING " << ident.GetKey();
   }
 
   void SFTNullRound::HandleDisconnect(const Connections::Id &id)
   {
+      if(GetOverlay()->IsServer(id)) {
+        qDebug() << "A server (" << id << ") disconnected, ignoring.";
+        return;
+      } else if(GetClients().Contains(id)) {
+        qDebug() << "A client (" << id << ") disconnected, ignoring.";
+        return;
+      }
+
+      qDebug() << "Server " << id << "failed!" << "watching from " << this->GetLocalId();
       //Also modifies the list
       if (this->sftViewManager->addFailedServer(id))
       {
-        int newView = this->sftViewManager->nextGoodView(this->sftViewManager->getCurrentViewNum() + 1);
-        this->sftViewManager->addViewChangeVote(newView, this->GetLocalId()); //Remember to vote for myself
-        //ADD BACK IN    this->sftMessageManager->sendViewChangeProposal(newView);
+          this->sftMessageManager->startViewVoting();
+          //ADD BACK IN    this->sftMessageManager->sendViewChangeProposal(newView);
       }
 
       if (this->sftViewManager->tooFewServers())
       {
           SetSuccessful(false);
+          qDebug() << "Round killed by too many server disconnects";
           Stop("Round killed by too many server disconnects");
       }
+  }
+
+  void SFTNullRound::OnStop()
+  {
+      //Do nothing
+      qDebug() << "Should be hitting this" << Stopped();
   }
 
   void SFTNullRound::OnStart()
   {
     Round::OnStart();
+
+    qDebug() << "CHECKING " << this->upstreamServers.count() << this->downstreamClients.count();
 
     if (isServer) {ServerOnStart();}
     else {ClientOnStart();}
@@ -59,7 +114,7 @@ namespace SFT {
   }
 
   //TODO: Is there even a way to broadcast specifically to clients?
-  void SFTNullRound::broadcastToClients(QVariantMap map)
+  void SFTNullRound::broadcastToDownstreamClients(QVariantMap map)
   {
       QVariant variant(map);
       QByteArray data;
@@ -68,7 +123,13 @@ namespace SFT {
       QByteArray msg;
       msg.append(data);
       msg.prepend(127);
-      GetOverlay()->Broadcast("SessionData", msg); //TODO: Why can't I broadcast to clients?
+
+      for (int i = 0; i < this->downstreamClients.count(); i++)
+      {
+          Connections::Id client = this->downstreamClients.at(i);
+          GetOverlay()->SendNotification(client, "SessionData", msg);
+      }
+      //GetOverlay()->Broadcast("SessionData", msg); //TODO: Why can't I broadcast to clients?
   }
 
   void SFTNullRound::broadcastToServers(QVariantMap map)
@@ -83,7 +144,7 @@ namespace SFT {
       GetOverlay()->BroadcastToServers("SessionData", msg);
   }
 
-  void SFTNullRound::sendToSingleServer(const Connections::Id &to, QVariantMap map)
+  void SFTNullRound::sendToSingleNode(const Connections::Id &to, QVariantMap map)
   {
       QVariant variant(map);
       QByteArray data;
@@ -97,16 +158,15 @@ namespace SFT {
 
   void SFTNullRound::ClientOnStart()
   {
-      QVariantMap map;
-      map.insert("Type", SFTMessageManager::MessageTypes::ClientMessage); //TODO: Just a test filler
-      broadcastToServers(map);
+      this->sftMessageManager->clientRoundMessageSend("abc");
   }
 
   void SFTNullRound::ServerOnStart()
   {
-      QVariantMap map;
+      this->sftMessageManager->startViewVoting();
+      /*QVariantMap map;
       map.insert("Type", SFTMessageManager::MessageTypes::ClientAttendance); //TODO: Just a test filler
-      broadcastToServers(map);
+      broadcastToServers(map);*/
   }
 
   void SFTNullRound::ProcessPacket(const Connections::Id &from, const QByteArray &data)

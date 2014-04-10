@@ -36,13 +36,12 @@ namespace SFT {
           const QSharedPointer<ClientServer::Overlay> &overlay,
           Messaging::GetDataCallback &get_data);
 
-
-
+      //TODO: Should name these more obviously to distinguish from MessageType
       enum RoundPhase {
-          Collection,
-          ClientAttendance,
-          ViewChangeVoting,
-          ExchangeCiphers
+          CollectionPhase,
+          ClientAttendancePhase,
+          ExchangeCiphersPhase,
+          ViewChangeVotingPhase
       };
 
       /**
@@ -69,23 +68,24 @@ namespace SFT {
 
   public slots:
       void broadcastToServers(QVariantMap map);
-      void broadcastToClients(QVariantMap map);
-      void sendToSingleServer(const Connections::Id &to, QVariantMap map); //More for client use
+      void broadcastToDownstreamClients(QVariantMap map);
+      void sendToSingleNode(const Connections::Id &to, QVariantMap map); //More for client use
 
     protected:
       /**
        * Called when the NullRound is started
        */
       virtual void OnStart();
+      virtual void OnStop();
       virtual void ClientOnStart();
       virtual void ServerOnStart();
 
     private:
-      /**
-       * Don't receive from a remote peer more than once...
-       */
       QVector<QByteArray> m_received;
       int m_msgs;
+      QList<Connections::Id> upstreamServers;
+      QList<Connections::Id> downstreamClients;
+
   };
 }
 }

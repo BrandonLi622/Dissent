@@ -29,7 +29,10 @@ namespace Tests {
   void CompleteRound(const Sessions &sessions);
   void StopSessions(const Sessions &sessions);
   void SendTest(const Sessions &sessions);
+  void SFTSendTest(const Sessions &sessions);
   void DisconnectServer(Sessions &sessions, bool hard);
+  void SFTDisconnectServer(Sessions &sessions, bool hard);
+
 }
 }
 

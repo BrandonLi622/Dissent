@@ -162,6 +162,42 @@ namespace Tests {
     qDebug() << "Finished SendTest";
   }
 
+  void SFTSendTest(const Sessions &sessions)
+  {
+    qDebug() << "Starting SFTSendTest";
+    QList<QByteArray> messages;
+    CryptoRandom rand;
+
+    foreach(const QSharedPointer<BufferSink> &sink, sessions.sinks) {
+      sink->Clear();
+    }
+
+    SignalCounter sc;
+    foreach(const QSharedPointer<SignalSink> &ssink, sessions.signal_sinks) {
+      QObject::connect(ssink.data(),
+          SIGNAL(IncomingData(const QByteArray &)),
+          &sc,
+          SLOT(Counter()));
+    }
+
+    foreach(const ClientPointer &cs, sessions.clients) {
+      QByteArray msg(64, 0);
+      rand.GenerateBlock(msg);
+      messages.append(msg);
+      cs->Send(msg);
+    }
+
+    RunUntil(sc, sessions.clients.size() * (sessions.clients.size() + sessions.servers.size()));
+
+    foreach(const QSharedPointer<BufferSink> &sink, sessions.sinks) {
+      ASSERT_EQ(messages.size(), sink->Count());
+      for(int idx = 0; idx < sink->Count(); idx++) {
+        ASSERT_TRUE(messages.contains(sink->At(idx).second));
+      }
+    }
+    qDebug() << "Finished SendTest";
+  }
+
   void DisconnectServer(Sessions &sessions, bool hard)
   {
     qDebug() << "Disconnecting server" << hard;
@@ -212,6 +248,55 @@ namespace Tests {
     StartRound(sessions);
     qDebug() << "Round started after disconnection";
   }
+
+  void SFTDisconnectServer(Sessions &sessions, bool hard)
+   {
+     qDebug() << "Disconnecting server" << hard;
+
+     int server_count = sessions.servers.count();
+     CryptoRandom rand;
+     int idx = rand.GetInt(0, server_count);
+     OverlayPointer op_disc = sessions.network.first[idx];
+
+     if(hard) {
+       op_disc->Stop();
+       sessions.servers[idx]->Stop();
+       // This will need to be adjusted if we support offline servers
+       Time::GetInstance().IncrementVirtualClock(60000);
+       Timer::GetInstance().VirtualRun();
+
+       OverlayPointer op(new Overlay(op_disc->GetId(),
+             op_disc->GetLocalEndpoints(),
+             op_disc->GetRemoteEndpoints(),
+             op_disc->GetServerIds()));
+       op->SetSharedPointer(op);
+       sessions.network.first[idx] = op;
+       ServerPointer ss = MakeSession<ServerSession>(
+             op, sessions.private_keys[op->GetId().ToString()],
+             sessions.keys, sessions.create_round);
+       sessions.servers[idx] = ss;
+       ss->SetSink(sessions.sink_multiplexers[idx].data());
+
+       op->Start();
+       ss->Start();
+     } else {
+       // 1 for the node itself and 1 for at least another peer
+       int disc_count = qMax(2, rand.GetInt(0, server_count));
+       QHash<int, bool> disced;
+       disced[idx] = true;
+       while(disced.size() < disc_count) {
+         int to_disc = rand.GetInt(0, server_count);
+         if(disced.contains(to_disc)) {
+           continue;
+         }
+         disced[to_disc] = true;
+         Id remote = sessions.network.first[to_disc]->GetId();
+         op_disc->GetConnectionTable().GetConnection(remote)->Disconnect();
+       }
+     }
+
+     qDebug() << "Disconnecting done";
+   }
 
   TEST(Session, Servers)
   {

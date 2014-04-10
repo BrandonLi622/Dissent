@@ -48,20 +48,24 @@ namespace Tests {
       //TestRoundBasic(TCreateRound<SFT::SFTNullRound>);
       Timer::GetInstance().UseVirtualTime();
       ConnectionManager::UseTimer = false;
-          OverlayNetwork net = ConstructOverlay(3, 10);
-          VerifyStoppedNetwork(net);
-          StartNetwork(net);
-          VerifyNetwork(net);
+      OverlayNetwork net = ConstructOverlay(5, 15);
+      VerifyStoppedNetwork(net);
+      StartNetwork(net);
+      VerifyNetwork(net);
 
-          Sessions sessions = BuildSessions(net, create_round);
-          qDebug() << "Starting sessions...";
-          StartSessions(sessions);
-          SendTest(sessions);
+      Sessions sessions = BuildSessions(net, create_round);
+      qDebug() << "Starting sessions...";
+      StartSessions(sessions);
 
-          StopSessions(sessions);
-          StopNetwork(sessions.network);
-          VerifyStoppedNetwork(sessions.network);
-          ConnectionManager::UseTimer = true;
+      SFTSendTest(sessions);
+      //SFTDisconnectServer(sessions, false);
+      //SFTDisconnectServer(sessions, false);
+      //SFTSendTest(sessions);
+
+      StopSessions(sessions);
+      StopNetwork(sessions.network);
+      VerifyStoppedNetwork(sessions.network);
+      ConnectionManager::UseTimer = true;
   }
 }
 }

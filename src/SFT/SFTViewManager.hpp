@@ -27,15 +27,18 @@ public:
 
     //Accessor / State information
     int getCurrentViewNum();
+    int getProposedViewNum();
     bool inCurrentView(const Connections::Id &nodeId);
     int getViewSize();
     bool tooFewServers(); //If this is true then we should kill the round
     QVector<Connections::Id> getCurrentServers();
 
+    //Modifiers
     bool addFailedServer(const Connections::Id &nodeId); //returns true if we need a view change
     int nextGoodView(int minViewNum); //Starting from @minViewNum give a view that does not contain any bad servers
-    int addViewChangeVote(int viewNum, const Connections::Id &voter);
+    int addViewChangeVote(int viewNum, bool vote, const Connections::Id &voter);
     bool setNewView(int viewNum);
+    void proposeNewView(int viewNum);
 
 
     //void startViewChangeProposal(int viewNum);
@@ -43,6 +46,7 @@ public:
 
 private:
     int viewNum;
+    int proposedViewNum;
     QVector<bool> *currentView;
     int numServers;
     const Identity::Roster m_servers;

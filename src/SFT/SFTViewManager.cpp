@@ -10,6 +10,7 @@ SFTViewManager::SFTViewManager(const Identity::Roster &servers,
     this->numServers = m_servers.Count();
     this->quorumRatio = quorumRatio;
     this->viewNum = 0;
+    this->proposedViewNum = 0;
     this->currentView = new QVector<bool>();
     this->viewChangeProposals = new QHash<int, QVariantMap>();
 
@@ -23,6 +24,16 @@ SFTViewManager::SFTViewManager(const Identity::Roster &servers,
 int SFTViewManager::getCurrentViewNum()
 {
     return this->viewNum;
+}
+
+int SFTViewManager::getProposedViewNum()
+{
+    return this->proposedViewNum;
+}
+
+void SFTViewManager::proposeNewView(int viewNum)
+{
+    this->proposedViewNum = viewNum;
 }
 
 bool SFTViewManager::inCurrentView(const Connections::Id &nodeId)
@@ -80,12 +91,13 @@ bool SFTViewManager::tooFewServers()
 }
 
 
-int SFTViewManager::addViewChangeVote(int viewNum, const Connections::Id &voter)
+int SFTViewManager::addViewChangeVote(int viewNum, bool vote, const Connections::Id &voter)
 {
     int serverID = voter.GetInteger().GetInt32();
     QVariantMap countMap = viewChangeProposals->value(viewNum, QVariantMap()); //want it to default to 0
 
     int count = countMap.value("Count", 0).toInt();
+    int rejections = countMap.value("Count", 0).toInt();
     QList<QVariant> voters = countMap.value("Voters", QList<QVariant>()).toList();
 
     //Don't allow double counting
@@ -97,18 +109,33 @@ int SFTViewManager::addViewChangeVote(int viewNum, const Connections::Id &voter)
     qDebug() << "COUNT: " << (count + 1);
 
     voters.append(serverID);
-    countMap.insert("Count", count + 1);
+
+    //Depending on the vote, then increment the correct amount
+    vote ? count++ : rejections++;
+
+    countMap.insert("Count", count);
+    countMap.insert("Rejections", rejections);
     countMap.insert("Voters", voters);
 
     viewChangeProposals->insert(viewNum, countMap);
 
     //TODO: should move out this proportion somewhere else...
-    if ((count + 1) >= 2.0 * this->m_servers.Count() / 3.0 && viewNum > getCurrentViewNum())
+    if (count >= 2.0 * this->m_servers.Count() / 3.0 && viewNum > getCurrentViewNum())
     {
+        qDebug() << "Before " << *(this->currentView);
         qDebug() << "Changed view";
         setNewView(viewNum);
+        qDebug() << "After " << *(this->currentView);
+
         return viewNum;
         //startRound(); //Need to discard everything and start a new round when the view changes
+    }
+    else if (rejections >= 1.0 * this->m_servers.Count())
+    {
+        //View change failed, so set back
+        this->proposedViewNum = this->viewNum;
+        this->viewChangeProposals->clear(); //TODO: Should this be cleared?
+        return -2;
     }
     return -1; //Means view did not change
 }
@@ -139,7 +166,7 @@ int SFTViewManager::getViewSize()
 QVector<bool> *SFTViewManager::calcServerMembership(int viewNum)
 {
     QVector<bool> *viewMembership = new QVector<bool>();
-    srand(viewNum); //TODO: is this good enough for variance?
+    srand(viewNum * 100); //TODO: is this good enough for variance?
 
     //everything is initially false
     for (int i = 0; i < this->numServers; i++)
