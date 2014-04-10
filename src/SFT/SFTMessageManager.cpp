@@ -99,6 +99,7 @@ void SFTMessageManager::startCipherExchange()
     map.insert("Type", MessageTypes::ServerCipher);
     map.insert("Cipher", cipherText);
     this->receivedServerCiphers->insert(this->localId.GetInteger().GetInt32(), cipherText);
+    this->lastCipher = cipherText; //Save it for use when prompted
 
     emit this->broadcastToServers(map);
     sendRequest(SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase);
@@ -213,7 +214,7 @@ QByteArray SFTMessageManager::insertInSlot(QString msg)
     for (int i = 0; i < index; i++)
     {
         //null values for other people's
-        for (int j = 0; j < this->keyLength; j++)
+        for (int j = 0; j < SFT::SFTMessageManager::keyLength; j++)
         {
             fullMsg.append(char(0));
         }
@@ -224,7 +225,7 @@ QByteArray SFTMessageManager::insertInSlot(QString msg)
     for (int i = index + 1; i < this->m_clients.Count(); i++)
     {
         //null values for other people's
-        for (int j = 0; j < this->keyLength; j++)
+        for (int j = 0; j < SFT::SFTMessageManager::keyLength; j++)
         {
             fullMsg.append(char(0));
         }
@@ -250,7 +251,7 @@ QByteArray SFTMessageManager::encryptClientMessage(int clientID, QByteArray data
 
         int serverID = servers.at(i).GetInteger().GetInt32();
         //This should really be the number of clients * keylength
-        QByteArray key = encryptionKey(serverID, clientID, this->keyLength, this->m_clients.Count());
+        QByteArray key = encryptionKey(serverID, clientID, SFT::SFTMessageManager::keyLength, this->m_clients.Count());
         xored = xorBytes(xored, key);
 
         qDebug() << "After xor: " << xored;
@@ -262,7 +263,7 @@ QByteArray SFTMessageManager::encryptClientMessage(int clientID, QByteArray data
 
 void SFTMessageManager::clientRoundMessageSend(QString msg)
 {
-    QString sub = msg.mid(0, this->keyLength); //Truncate the message to what we can actually send
+    QString sub = msg.mid(0, SFT::SFTMessageManager::keyLength); //Truncate the message to what we can actually send
     QByteArray insertedMsg = insertInSlot(sub);
     QByteArray encrypted = encryptClientMessage(this->localId.GetInteger().GetInt32(), insertedMsg);
     QVariantMap map = genClientMessage(this->sftViewManager->getCurrentViewNum(), encrypted); //TODO: Better hope this value is correct
@@ -318,7 +319,7 @@ QByteArray SFTMessageManager::createCipher()
     for (int i = 0; i < totalRoundClients->count(); i++)
     {
         int clientID = totalRoundClients->at(i);
-        QByteArray key = encryptionKey(thisID, clientID, this->keyLength, int(this->m_clients.Count()));
+        QByteArray key = encryptionKey(thisID, clientID, SFT::SFTMessageManager::keyLength, int(this->m_clients.Count()));
 
         xored = xorBytes(xored, key);
     }
@@ -450,8 +451,8 @@ void SFTMessageManager::processCipher(QVariantMap map, const Connections::Id &fr
         return;
     }
 
-    qDebug() << "Expecting " << this->sftViewManager->getViewSize() << " cipher responses";
-    qDebug() << "Received " << this->receivedServerCiphers->count() + 1 << " cipher responses";
+    qDebug() << "Expecting " << this->sftViewManager->getViewSize() << " cipher responses" << this->localId;
+    qDebug() << "Received " << this->receivedServerCiphers->count() + 1 << " cipher responses" << this->localId;
     int serverID = from.GetInteger().GetInt32();
 
     QByteArray cipher = map.value("Cipher").toByteArray();
@@ -467,6 +468,7 @@ void SFTMessageManager::processCipher(QVariantMap map, const Connections::Id &fr
     {
         //DONE WITH THE ROUND!
         //Should now decrypt and send back to clients
+        qDebug() << "Done with decryption" << this->localId;
         QVariantMap map = genDecryption(this->sftViewManager->getCurrentViewNum());
         //TODO: Should really only be sending to own clients...
         emit this->broadcastToDownstreamClients(map);
@@ -491,18 +493,25 @@ void SFTMessageManager::processInfoRequest(QVariantMap map, const Connections::I
 {
     SFT::SFTNullRound::RoundPhase type = (SFT::SFTNullRound::RoundPhase) map.value("Request").toInt();
 
+    //Not-in-view servers cannot participate in this
     if (type == SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase)
     {
+        if (!this->sftViewManager->inCurrentView(this->localId))
+        {
+            qDebug() << "This local server is not in the current view" << this->localId;
+            return;
+        }
+
         qDebug() << "Received ciphers request" << this->localId << "";
 
-        if (this->roundPhase >= SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase)
+        if (this->roundPhase >= SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase ||
+            this->roundPhase == SFT::SFTNullRound::RoundPhase::CollectionPhase)
         {
             qDebug() << "Responding to ciphers request" << this->localId << "";
 
-            QByteArray cipherText = this->createCipher();
             QVariantMap resp = QVariantMap();
             resp.insert("Type", QVariant(MessageTypes::ServerCipher));
-            resp.insert("Cipher", QVariant(cipherText));
+            resp.insert("Cipher", QVariant(this->lastCipher));
 
             emit this->sendToSingleNode(from, resp);
             return;
@@ -530,8 +539,15 @@ void SFTMessageManager::processInfoRequest(QVariantMap map, const Connections::I
             return;
         }
     }
+    //Not-in-view servers cannot participate in this, for now
     else if (type == SFT::SFTNullRound::RoundPhase::ClientAttendancePhase)
     {
+        if (!this->sftViewManager->inCurrentView(this->localId))
+        {
+            qDebug() << "This local server is not in the current view" << this->localId;
+            return;
+        }
+
         qDebug() << "Received attendance request" << this->localId << "";
 
         if (this->roundPhase >= SFT::SFTNullRound::RoundPhase::ClientAttendancePhase)
@@ -599,7 +615,7 @@ void SFTMessageManager::processViewChangeProposal(QVariantMap map, const Connect
         //If it's not in the round then just keep it stalling until it's in the view
         else
         {
-            this->roundPhase = SFT::SFTNullRound::RoundPhase::Collection;
+            this->roundPhase = SFT::SFTNullRound::RoundPhase::CollectionPhase;
         }
     }
     //Means that the view changed and also that the view change was rejected
@@ -612,6 +628,12 @@ void SFTMessageManager::processViewChangeProposal(QVariantMap map, const Connect
 
 void SFTMessageManager::processClientList(QVariantMap map, const Connections::Id &from)
 {
+    if (!this->sftViewManager->inCurrentView(this->localId))
+    {
+        qDebug() << "This local server is not in the current view" << this->localId;
+        return;
+    }
+
     if (this->roundPhase != SFT::SFTNullRound::RoundPhase::ClientAttendancePhase)
     {
         qDebug() << "Wrong time for client attendance" << this->roundPhase;
@@ -630,8 +652,8 @@ void SFTMessageManager::processClientList(QVariantMap map, const Connections::Id
         return;
     }
 
-    qDebug() << "Expecting " << this->sftViewManager->getViewSize() << " attendance responses";
-    qDebug() << "Received " << this->respondedServers->count() + 1 << " attendance responses";
+    qDebug() << "Expecting " << this->sftViewManager->getViewSize() << " attendance responses" << this->localId;
+    qDebug() << "Received " << this->respondedServers->count() + 1 << " attendance responses" << this->localId;
 
     //Add all of the round clients into the list
     QList<QVariant> clientList = map.value("ClientList").toList();
@@ -655,6 +677,12 @@ void SFTMessageManager::processClientList(QVariantMap map, const Connections::Id
 //TODO: Cannot do duplicates!
 void SFTMessageManager::processClientMessage(QVariantMap map, const Connections::Id &from)
 {
+    if (!this->sftViewManager->inCurrentView(this->localId))
+    {
+        qDebug() << "This local server is not in the current view" << this->localId;
+        return;
+    }
+
     qDebug() << "Processing client message";
     if (this->roundPhase != SFT::SFTNullRound::RoundPhase::CollectionPhase)
     {
@@ -741,6 +769,10 @@ void SFTMessageManager::processDecrypted(QVariantMap map)
     QByteArray b = map.value("Decrypted").toByteArray();
     QString finalOutput = QString(b).replace('\0', ' '); //Need this for displaying
     qDebug() << "Decrypted message" << map << b << finalOutput;
+
+    //Call this in the NullRound
+    emit this->pushDataOut(b);
+
 }
 
 

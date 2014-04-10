@@ -30,6 +30,8 @@ public:
     //Decrypted ("Decrypted", QByteArray) and ("ViewNum", int)
     //ClientAttendance ("ClientList", QList<QVariant>)
 
+    const static int keyLength = 3;
+
     enum MessageTypes {
       ViewChangeVote,
       ViewChangeNotification,
@@ -87,6 +89,7 @@ signals:
     void sendToSingleNode(Connections::Id peer, QVariantMap map);
     void broadcastToServers(QVariantMap map);
     void broadcastToDownstreamClients(QVariantMap map);
+    void pushDataOut(QByteArray data);
 
 
 private:
@@ -112,7 +115,6 @@ private:
     QList<int> *respondedClients;
     QList<int> *totalRoundClients;
 
-    int keyLength = 3;
 
     Connections::Id localId;
     Identity::Roster m_clients;
@@ -120,6 +122,8 @@ private:
     bool isServer;
     QList<Connections::Id> m_connections;
     SFT::SFTViewManager *sftViewManager;
+
+    QByteArray lastCipher; //So that the slowest person in a round can get the ciphertexts
 
 
 };

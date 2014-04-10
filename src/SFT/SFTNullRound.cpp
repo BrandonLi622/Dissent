@@ -62,8 +62,15 @@ namespace SFT {
       connect(this->sftMessageManager, SIGNAL(broadcastToDownstreamClients(QVariantMap)), this, SLOT(broadcastToDownstreamClients(QVariantMap)));
       connect(this->sftMessageManager, SIGNAL(broadcastToServers(QVariantMap)), this, SLOT(broadcastToServers(QVariantMap)));
       connect(this->sftMessageManager, SIGNAL(sendToSingleNode(Connections::Id,QVariantMap)), this, SLOT(sendToSingleNode(Connections::Id,QVariantMap)));
+      connect(this->sftMessageManager, SIGNAL(pushDataOut(QByteArray)), this, SLOT(pushDataOut(QByteArray)));
 
       qDebug() << "SFTNullRound constructor IS WORKING " << ident.GetKey();
+  }
+
+  void SFTNullRound::pushDataOut(QByteArray data)
+  {
+      qDebug() << "Getting called";
+      this->PushData(this->GetSharedPointer(), data);
   }
 
   void SFTNullRound::HandleDisconnect(const Connections::Id &id)
@@ -163,7 +170,9 @@ namespace SFT {
 
   void SFTNullRound::ServerOnStart()
   {
-      this->sftMessageManager->startViewVoting();
+      //this->sftMessageManager->startViewVoting();
+
+
       /*QVariantMap map;
       map.insert("Type", SFTMessageManager::MessageTypes::ClientAttendance); //TODO: Just a test filler
       broadcastToServers(map);*/

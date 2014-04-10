@@ -69,7 +69,8 @@ namespace SFT {
   public slots:
       void broadcastToServers(QVariantMap map);
       void broadcastToDownstreamClients(QVariantMap map);
-      void sendToSingleNode(const Connections::Id &to, QVariantMap map); //More for client use
+      void sendToSingleNode(const Connections::Id &to, QVariantMap map);
+      void pushDataOut(QByteArray data);
 
     protected:
       /**
@@ -85,7 +86,6 @@ namespace SFT {
       int m_msgs;
       QList<Connections::Id> upstreamServers;
       QList<Connections::Id> downstreamClients;
-
   };
 }
 }
