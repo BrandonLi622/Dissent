@@ -151,28 +151,36 @@ namespace Tests {
       rand.GenerateBlock(msg);
       messages.append(msg);
       cs->Send(msg);
+
+
     }
 
     RunUntil(sc, sessions.clients.size() * (sessions.clients.size() + sessions.servers.size()));
 
     foreach(const QSharedPointer<BufferSink> &sink, sessions.sinks) {
       ASSERT_EQ(messages.size(), sink->Count());
+
+      qDebug() << sessions.sinks.indexOf(sink);
       for(int idx = 0; idx < sink->Count(); idx++) {
         ASSERT_TRUE(messages.contains(sink->At(idx).second));
+        qDebug() << "Sink value" << idx;
       }
     }
     qDebug() << "Finished SendTest";
   }
 
-  void SFTSendTest(const Sessions &sessions)
+  void SFTSendTest(const Sessions &sessions, int numOnline)
   {
     qDebug() << "Starting SFTSendTest";
     QList<QByteArray> messages;
-    CryptoRandom rand;
+    //CryptoRandom rand;
 
     foreach(const QSharedPointer<BufferSink> &sink, sessions.sinks) {
       sink->Clear();
     }
+
+    qDebug() << "number of sinks: " << sessions.sinks.count();
+    qDebug() << "number of clients: " << sessions.clients.count();
 
     SignalCounter sc;
     foreach(const QSharedPointer<SignalSink> &ssink, sessions.signal_sinks) {
@@ -182,80 +190,138 @@ namespace Tests {
           SLOT(Counter()));
     }
 
+    QString expectedOutput = "";
+
     foreach(const ClientPointer &cs, sessions.clients) {
-      //QByteArray msg(64, 0);
-      //rand.GenerateBlock(msg);
+        int clientIndex = sessions.clients.indexOf(cs);
+        char letter = 'a';
+        QString exchangeMsg = "";
+        exchangeMsg.append(QChar(letter + clientIndex));
+        exchangeMsg.append(QChar(letter + clientIndex + 1));
+        exchangeMsg.append(QChar(letter + clientIndex + 2));
 
-
-        QString slot = "ghi";
-        QByteArray wholeMessage;
-
-        int index = sessions.clients.indexOf(cs);
-
-        for (int i = 0; i < index; i++)
-        {
-            for (int j = 0; j < SFT::SFTMessageManager::keyLength; j++)
-            {
-                wholeMessage.append('\0');
-            }
-        }
-
-        wholeMessage.append(slot);
-
-        for (int i = index + 1; i < sessions.clients.count(); i++)
-        {
-            for (int j = 0; j < SFT::SFTMessageManager::keyLength; j++)
-            {
-                wholeMessage.append('\0');
-            }
-        }
-
-        QVariantMap map;
-        map.insert("Type", SFT::SFTMessageManager::MessageTypes::ClientMessage);
-        map.insert("Message", wholeMessage);
-        QVariant variant(map);
+        QVariant variant(exchangeMsg);
         QByteArray data;
         QDataStream stream(&data,QIODevice::WriteOnly);
         stream << variant;
-        QByteArray msg;
-        msg.append(data);
-        msg.prepend(127);
-
-        //messages.append(msg);
-        //cs->Send(msg);
-
-        QByteArray printOut(msg);
-        qDebug() << "Expected output" << printOut.length() << msg.length() << slot.length() << wholeMessage.length() << printOut.replace("\0", " ");
-        qDebug() << slot;
-
-      //messages.append(msg);
-      //cs->Send(msg);
+        QByteArray toSend;
+        toSend.append(data);        
+        cs->Send(toSend);
+        qDebug() << "Sending: " << toSend.replace('\0', ' ');
+        expectedOutput.append(exchangeMsg);
     }
 
-    RunUntil(sc, sessions.clients.size() * (sessions.clients.size() + sessions.servers.size()));
+    /*
+    int numOnline = 0;
+    for (int i = 0; i < sessions.network.second.count(); i++)
+    {
+        OverlayPointer op_client = sessions.network.second[i];
+        int numServers = op_client->GetConnectionTable().GetConnections().length();
+
+        //All servers that have a connection to a client still are online
+        numOnline += numServers;
+
+        //If the client still has a connection to a server, then it is online
+        if (numServers > 0)
+        {
+            numOnline++;
+        }
+    }*/
+
+    qDebug() << "Number of online nodes: " << numOnline;
+
+    qDebug() << "Expected output is: " << expectedOutput;
+
+    for (int i = 0; i < sessions.clients.length(); i++) {
+        QVariant variant(expectedOutput);
+        QByteArray data;
+        QDataStream stream(&data,QIODevice::WriteOnly);
+        stream << variant;
+
+        messages.append(data); //All clients are expecting the same thing at the end
+    }
+
+    //Each client sends a message
+    qDebug() << "Start run until";
+    qDebug() << "Signal count: " << sc.GetCount();
+
+
+    //How do I get connections from here?
+    qDebug() << RunUntil(sc, numOnline); //TODO: Hardcoded for now
+
+
+    qDebug() << "End run until";
+    qDebug() << "Signal count: " << sc.GetCount();
 
     foreach(const QSharedPointer<BufferSink> &sink, sessions.sinks) {
-      //ASSERT_EQ(messages.size(), sink->Count());
+      //ASSERT_EQ(numOnline, sink->Count());
       for(int idx = 0; idx < sink->Count(); idx++) {
-          qDebug() << "Sink value" << idx << sink->At(idx).second;
+          QByteArray temp(sink->At(idx).second); //Don't want to be modifiying sink->At(idx).second, so make a copy
+          temp.replace('\0', ' ');
+          qDebug() << "Sink value" << idx << temp;
           //ASSERT_TRUE(messages.contains(sink->At(idx).second));
       }
     }
     qDebug() << "Finished SendTest";
   }
 
-  void DisconnectServer(Sessions &sessions, bool hard)
+  void SFTDisconnectServer(Sessions &sessions, bool hard, QList<int> *disconnectedServers, int numOnline[1])
   {
     qDebug() << "Disconnecting server" << hard;
 
     int server_count = sessions.servers.count();
     CryptoRandom rand;
-    int idx = rand.GetInt(0, server_count);
+    int idx;
+
+    if (server_count == disconnectedServers->count())
+    {
+        qDebug() << "All servers already disconnected!!";
+        return;
+    }
+
+    //Want to guarantee a new idx every time
+    while (true)
+    {
+        idx = rand.GetInt(0, server_count);
+        if (!disconnectedServers->contains(idx))
+        {
+            break;
+        }
+        disconnectedServers->append(idx);
+
+    }
     OverlayPointer op_disc = sessions.network.first[idx];
 
     if(hard) {
       op_disc->Stop();
       sessions.servers[idx]->Stop();
+
+      //Need to erase the server's existence
+      qDebug() << "Before, servers : " << sessions.servers.count();
+
+
+
+      sessions.sinks.removeAt(idx);
+      sessions.signal_sinks.removeAt(idx);
+      sessions.sink_multiplexers.removeAt(idx);
+
+      //Cannot get rid of the public key! (or the private key for that matter)
+      //sessions.keys.
+      //sessions.private_keys.remove(sessions.servers[idx]->GetOverlay()->GetId().ToString());
+
+      sessions.servers.removeAt(idx);
+      sessions.network.first.removeAt(idx);
+      qDebug() << op_disc->Stopped();
+      qDebug() << "After, servers : " << sessions.servers.count();
+
+      /*
+      foreach(const ClientPointer &cs, sessions.clients) {
+          qDebug() << cs->;
+      }*/
+
+
+
+      /*
       // This will need to be adjusted if we support offline servers
       Time::GetInstance().IncrementVirtualClock(60000);
       Timer::GetInstance().VirtualRun();
@@ -273,29 +339,52 @@ namespace Tests {
       ss->SetSink(sessions.sink_multiplexers[idx].data());
 
       op->Start();
-      ss->Start();
+      ss->Start();*/
     } else {
-      // 1 for the node itself and 1 for at least another peer
-      int disc_count = qMax(2, rand.GetInt(0, server_count));
+
+      //MODIFIED: Disconnect a select server from all other servers
+      int disc_count = server_count;
       QHash<int, bool> disced;
       disced[idx] = true;
-      while(disced.size() < disc_count) {
+      while(disced.size() < disc_count) {          
         int to_disc = rand.GetInt(0, server_count);
         if(disced.contains(to_disc)) {
           continue;
         }
         disced[to_disc] = true;
+        qDebug() << "SFT Disconnected edge (" << idx << ", " << to_disc << ")";
         Id remote = sessions.network.first[to_disc]->GetId();
         op_disc->GetConnectionTable().GetConnection(remote)->Disconnect();
+        //op_disc->GetConnectionTable().RemoveConnection(op_disc->GetConnectionTable().GetConnection(remote));
       }
+
+      //Server is now disconnected
+      numOnline[0]--;
+
+
+      //TODO: Also disconnect the server from each of its clients
+      Id remote = sessions.network.first[idx]->GetId();
+      for (int i = 0; i < sessions.network.second.count(); i++)
+      {
+          OverlayPointer op_client = sessions.network.second[i];
+
+          //If the client has a connection to the server, disconnect!
+          if (op_client->GetConnectionTable().GetConnection(remote) != 0)
+          {
+              op_client->GetConnectionTable().GetConnection(remote)->Disconnect();
+              //All of the server's clients are disconnected, because we are assuming only 1 server
+              numOnline[0]--;
+          }
+      }
+
     }
 
     qDebug() << "Disconnecting done";
-    StartRound(sessions);
-    qDebug() << "Round started after disconnection";
+    //StartRound(sessions);
+    //qDebug() << "Round started after disconnection";
   }
 
-  void SFTDisconnectServer(Sessions &sessions, bool hard)
+  void DisconnectServer(Sessions &sessions, bool hard)
    {
      qDebug() << "Disconnecting server" << hard;
 

@@ -37,11 +37,16 @@ namespace SFT {
           Messaging::GetDataCallback &get_data);
 
       //TODO: Should name these more obviously to distinguish from MessageType
-      enum RoundPhase {
+      enum ServerRoundPhase {
           CollectionPhase,
           ClientAttendancePhase,
           ExchangeCiphersPhase,
           ViewChangeVotingPhase
+      };
+
+      enum ClientRoundPhase {
+          SendPhase,
+          ReceivePhase
       };
 
       /**
@@ -68,9 +73,13 @@ namespace SFT {
 
   public slots:
       void broadcastToServers(QVariantMap map);
+      void broadcastToEveryone(QVariantMap map);
       void broadcastToDownstreamClients(QVariantMap map);
       void sendToSingleNode(const Connections::Id &to, QVariantMap map);
       void pushDataOut(QByteArray data);
+      void endSuccessful();
+      void startMessageExchange();
+
 
     protected:
       /**
@@ -81,11 +90,18 @@ namespace SFT {
       virtual void ClientOnStart();
       virtual void ServerOnStart();
 
+
+      //void checkOnlineServers(); //Really more for servers
+
+
     private:
       QVector<QByteArray> m_received;
       int m_msgs;
       QList<Connections::Id> upstreamServers;
       QList<Connections::Id> downstreamClients;
+
+
+      int roundNumber;
   };
 }
 }

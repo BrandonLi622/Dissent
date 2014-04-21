@@ -30,8 +30,10 @@ public:
     int getProposedViewNum();
     bool inCurrentView(const Connections::Id &nodeId);
     int getViewSize();
+    int getNumLiveServers();
     bool tooFewServers(); //If this is true then we should kill the round
     QVector<Connections::Id> getCurrentServers();
+    bool isFirstInView(const Connections::Id &nodeId);
 
     //Modifiers
     bool addFailedServer(const Connections::Id &nodeId); //returns true if we need a view change

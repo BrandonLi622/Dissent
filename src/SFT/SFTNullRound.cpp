@@ -12,7 +12,10 @@ namespace SFT {
     m_received(servers.Count() + clients.Count()),
     m_msgs(0)
   {
+
+
       this->isServer = false;
+      this->roundNumber = 0;
 
       //Why doesn't it like when I use new?
       this->downstreamClients = QList<Connections::Id>();
@@ -57,45 +60,80 @@ namespace SFT {
           qDebug() << "SFT is neither";
       }
 
-
       qDebug() << "Signals connected";
       connect(this->sftMessageManager, SIGNAL(broadcastToDownstreamClients(QVariantMap)), this, SLOT(broadcastToDownstreamClients(QVariantMap)));
       connect(this->sftMessageManager, SIGNAL(broadcastToServers(QVariantMap)), this, SLOT(broadcastToServers(QVariantMap)));
+      connect(this->sftMessageManager, SIGNAL(broadcastToEveryone(QVariantMap)), this, SLOT(broadcastToEveryone(QVariantMap)));
+
       connect(this->sftMessageManager, SIGNAL(sendToSingleNode(Connections::Id,QVariantMap)), this, SLOT(sendToSingleNode(Connections::Id,QVariantMap)));
       connect(this->sftMessageManager, SIGNAL(pushDataOut(QByteArray)), this, SLOT(pushDataOut(QByteArray)));
+      connect(this->sftMessageManager, SIGNAL(messageExchangeEnded()), this, SLOT(startMessageExchange()));
 
+
+      //connect(this->sftMessageManager, SIGNAL(roundSuccessful()), this, SLOT(endSuccessful()));
       qDebug() << "SFTNullRound constructor IS WORKING " << ident.GetKey();
   }
 
   void SFTNullRound::pushDataOut(QByteArray data)
   {
-      qDebug() << "Getting called";
+      qDebug() << "Push data getting called";
+      /*QByteArray data2(data); //So that we can have a pointer to it
+      QDataStream stream(&data2,QIODevice::ReadOnly);
+      QVariant variant;
+      stream>>variant;
+      final = qvariant_cast<QString>(variant);
+      qDebug() << final;*/
+
       this->PushData(this->GetSharedPointer(), data);
+      //this->GetData(1024); // we want it to flush
+
+      //Probably don't want to start this immediately...
+
+
+      if (this->GetClients().Contains(this->GetLocalId()))
+      {
+          //QTimer::singleShot(500, this, SLOT(startMessageExchange()));
+          startMessageExchange();
+      }
+
+      this->roundNumber++;
+
+
+      //endSuccessful();
   }
 
   void SFTNullRound::HandleDisconnect(const Connections::Id &id)
   {
       if(GetOverlay()->IsServer(id)) {
         qDebug() << "A server (" << id << ") disconnected, ignoring.";
-        return;
       } else if(GetClients().Contains(id)) {
         qDebug() << "A client (" << id << ") disconnected, ignoring.";
         return;
       }
 
-      qDebug() << "Server " << id << "failed!" << "watching from " << this->GetLocalId();
+      qDebug() << "Round" << this->roundNumber << ": Server" << id << "failed! watching from " << this->GetLocalId() << this->isServer;
+
       //Also modifies the list
+      //TODO: This is incorrect, model based on below
       if (this->sftViewManager->addFailedServer(id))
       {
+          if (this->sftViewManager->tooFewServers())
+          {
+              if (this->Stopped())
+              {
+                  return;
+              }
+
+              int numLiveServers = this->sftViewManager->getNumLiveServers();
+              SetSuccessful(false);
+              qDebug() << "Round killed by too many server disconnects" << numLiveServers << this->GetLocalId();
+              Stop("2Round killed by too many server disconnects" + QString::number(numLiveServers));
+              return;
+          }
+
+          qDebug() << "Starting view voting";
           this->sftMessageManager->startViewVoting();
           //ADD BACK IN    this->sftMessageManager->sendViewChangeProposal(newView);
-      }
-
-      if (this->sftViewManager->tooFewServers())
-      {
-          SetSuccessful(false);
-          qDebug() << "Round killed by too many server disconnects";
-          Stop("Round killed by too many server disconnects");
       }
   }
 
@@ -107,18 +145,19 @@ namespace SFT {
 
   void SFTNullRound::OnStart()
   {
+      qDebug() << "Printing connection table";
+      this->GetOverlay()->GetConnectionTable().PrintConnectionTable();
+
     Round::OnStart();
 
     qDebug() << "CHECKING " << this->upstreamServers.count() << this->downstreamClients.count();
 
     if (isServer) {ServerOnStart();}
     else {ClientOnStart();}
-
-    //Not really sure what all of this does
-    QPair<QByteArray, bool> data = GetData(1024);
-    QByteArray msg = data.first;
-    msg.prepend(127);
   }
+
+  //TODO: Probably want a way to broadcast view change to ALL clients
+
 
   //TODO: Is there even a way to broadcast specifically to clients?
   void SFTNullRound::broadcastToDownstreamClients(QVariantMap map)
@@ -127,9 +166,8 @@ namespace SFT {
       QByteArray data;
       QDataStream stream(&data,QIODevice::WriteOnly);
       stream << variant;
-      QByteArray msg;
-      msg.append(data);
-      msg.prepend(127);
+
+      QByteArray msg = GetHeaderBytes() + data;
 
       for (int i = 0; i < this->downstreamClients.count(); i++)
       {
@@ -139,15 +177,25 @@ namespace SFT {
       //GetOverlay()->Broadcast("SessionData", msg); //TODO: Why can't I broadcast to clients?
   }
 
+  void SFTNullRound::broadcastToEveryone(QVariantMap map)
+  {
+      QVariant variant(map);
+      QByteArray data;
+      QDataStream stream(&data,QIODevice::WriteOnly);
+      stream << variant;
+      QByteArray msg = GetHeaderBytes() + data;
+
+      GetOverlay()->Broadcast("SessionData", msg);
+  }
+
   void SFTNullRound::broadcastToServers(QVariantMap map)
   {
       QVariant variant(map);
       QByteArray data;
       QDataStream stream(&data,QIODevice::WriteOnly);
       stream << variant;
-      QByteArray msg;
-      msg.append(data);
-      msg.prepend(127);
+      QByteArray msg = GetHeaderBytes() + data;
+
       GetOverlay()->BroadcastToServers("SessionData", msg);
   }
 
@@ -157,26 +205,79 @@ namespace SFT {
       QByteArray data;
       QDataStream stream(&data,QIODevice::WriteOnly);
       stream << variant;
-      QByteArray msg;
-      msg.append(data);
-      msg.prepend(127);
+      QByteArray msg = GetHeaderBytes() + data;
+
       GetOverlay()->SendNotification(to, "SessionData", msg);
+  }
+
+
+  //For the clients
+  void SFTNullRound::startMessageExchange()
+  {
+      QString final = "";
+
+      qDebug() << "Starting a message exchange!" << this->GetLocalId();
+
+      //while (final == "") {
+          QPair<QByteArray, bool> data = GetData(1024);
+          QByteArray msg = data.first;
+
+          QByteArray data2(msg); //So that we can have a pointer to it
+          QDataStream stream(&data2,QIODevice::ReadOnly);
+          QVariant variant;
+          stream>>variant;
+          final = qvariant_cast<QString>(variant);
+          qDebug() << "Got Data at " << this->GetLocalId() << final;
+      //}
+
+
+      //TODO: JUST A HACK
+      QString final2("abc");
+
+      //Send the data that is to be sent in this round
+      this->sftMessageManager->clientRoundMessageSend(final2);
   }
 
   void SFTNullRound::ClientOnStart()
   {
-      this->sftMessageManager->clientRoundMessageSend("abc");
+      startMessageExchange();
   }
 
   void SFTNullRound::ServerOnStart()
   {
-      //this->sftMessageManager->startViewVoting();
-
-
-      /*QVariantMap map;
-      map.insert("Type", SFTMessageManager::MessageTypes::ClientAttendance); //TODO: Just a test filler
-      broadcastToServers(map);*/
+      //checkOnlineServers();
   }
+
+  /*
+  void SFTNullRound::checkOnlineServers()
+  {
+      int newView;
+
+      for (int i = 0; i < this->GetServers().Count(); i++)
+      {
+          Connections::Id server = GetServers().GetId(i);
+
+          if (this->GetOverlay()->GetConnectionTable().GetConnection(server) == 0)
+          {
+              qDebug() << "SFT Server is disconnected: " << server;
+              newView = this->sftViewManager->addFailedServer(server);
+          }
+      }
+
+      //If there aren't enough servers, then we cannot perform the round
+      if (this->sftViewManager->tooFewServers())
+      {
+          SetSuccessful(false);
+          qDebug() << "Round killed by too many server disconnects";
+          Stop("Round killed by too many server disconnects");
+      }
+
+      if (newView != this->sftViewManager->getCurrentViewNum())
+      {
+          qDebug() << "We are starting the view voting";
+          this->sftMessageManager->startViewVoting();
+      }
+  }*/
 
   void SFTNullRound::ProcessPacket(const Connections::Id &from, const QByteArray &data)
   {
@@ -203,8 +304,6 @@ namespace SFT {
 
   void SFTNullRound::ClientProcessPacket(const Connections::Id &from, const QByteArray &data)
   {
-      //GetOverlay()->SendNotification(from, "TEST", data);
-
       qDebug() << "THIS IS BRANDON'S";
 
       QByteArray data2(data); //So that we can have a pointer to it
@@ -215,9 +314,6 @@ namespace SFT {
       qDebug() << from;
       QVariantMap map = qvariant_cast<QVariantMap>(variant);
       this->sftMessageManager->switchClientMessage(map, from);
-
-
-
   }
 
   void SFTNullRound::ServerProcessPacket(const Connections::Id &from, const QByteArray &data)
@@ -230,93 +326,15 @@ namespace SFT {
       qDebug() << from;
       QVariantMap map = qvariant_cast<QVariantMap>(variant);
       this->sftMessageManager->switchServerMessage(map, from);
-      //GetOverlay()->SendNotification(from, "TEST", data);
+  }
+
+  void SFTNullRound::endSuccessful()
+  {
+      SetSuccessful(true);
+      Stop("Round successfully finished.");
+      qDebug() << "Round done" << this->GetLocalId();
   }
 }
 }
 
 
-// 1) Instead of checking for duplicates, I should look at what type of message it is and do the appropriate action
-// 2) Keep track of who send messages but terminate round when we receive from everyone in the view, not entire server list
-// 3) Everything else stays the same
-
-/*
-//MOVE THIS
-int idx = 0;
-if(GetOverlay()->IsServer(from)) {
-  idx = GetServers().GetIndex(from);
-} else {
-  idx = GetServers().Count() + GetClients().GetIndex(from);
-}
-if(!m_received[idx].isEmpty()) {
-  qWarning() << "Receiving a second message from: " << from;
-  return;
-}
-
-if(!data.isEmpty()) {
-  qDebug() << GetLocalId().ToString() << "received a real message from" << from;
-}
-
-m_received[idx] = data;
-m_msgs++;
-
-qDebug() << GetLocalId().ToString() << "received" <<
-  m_msgs << "expecting" << m_received.size();
-
-if(m_msgs != m_received.size()) {
-  return;
-}
-
-foreach(const QByteArray &msg, m_received) {
-  if(!msg.isEmpty()) {
-    PushData(GetSharedPointer(), msg);
-  }
-}
-
-SetSuccessful(true);
-Stop("Round successfully finished.");*/
-
-/*
-QByteArray payload;
-if(!Verify(from, data, payload)) {
-  throw QRunTimeError("Invalid signature or data");
-}
-
-if(_state == Offline) {
-  throw QRunTimeError("Should never receive a message in the bulk"
-      " round while offline.");
-}
-
-QDataStream stream(payload);
-
-int mtype;
-QByteArray round_id;
-stream >> mtype >> round_id;
-
-MessageType msg_type = (MessageType) mtype;
-
-Id rid(round_id);
-if(rid != GetRoundId()) {
-  throw QRunTimeError("Not this round: " + rid.ToString() + " " +
-      GetRoundId().ToString());
-}
-
-if(_state == Shuffling) {
-  _log.Pop();
-  _offline_log.Append(data, from);
-  return;
-}
-
-switch(msg_type) {
-  case BulkData:
-    HandleBulkData(stream, from);
-    break;
-  case LoggedBulkData:
-    HandleLoggedBulkData(stream, from);
-    break;
-  case AggregatedBulkData:
-    HandleAggregatedBulkData(stream, from);
-    break;
-  default:
-    throw QRunTimeError("Unknown message type");
-}*/

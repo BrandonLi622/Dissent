@@ -232,6 +232,8 @@ namespace Server {
         QSharedPointer<ServerSessionSharedState> state =
           GetSharedState().dynamicCast<ServerSessionSharedState>();
 
+
+        qDebug() << "Calling handle connection " << remote;
         if(state->GetOverlay()->IsServer(remote) && CheckServers()) {
           return NextState;
         }
@@ -1033,9 +1035,15 @@ namespace Server {
 
       virtual ProcessResult HandleDisconnection(const Connections::Id &id)
       {
+          qDebug() << "TODO: Disconnection at " << id;
+
         QSharedPointer<ServerSessionSharedState> state =
           GetSharedState().dynamicCast<ServerSessionSharedState>();
-        return state->DefaultHandleDisconnection(id);
+
+        this->GetSharedState()->GetRound()->HandleDisconnect(id);
+
+        return NoChange; //
+        //state->DefaultHandleDisconnection(id);
       }
 
     private:

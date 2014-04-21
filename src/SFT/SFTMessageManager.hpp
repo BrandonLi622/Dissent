@@ -2,6 +2,7 @@
 #define SFTMESSAGEMANAGER_HPP
 
 #include <QVariant>
+#include <QTimer>
 #include "Connections/Id.hpp"
 #include "SFT/SFTViewManager.hpp"
 #include "SFT/SFTNullRound.hpp"
@@ -26,6 +27,7 @@ public:
     //ViewChangeVote: ("ViewNum", int)
     //ViewChangeNotification: ("ViewNum", int)
     //ClientMessage ("ViewNum", int) and ("Message", QByteArray)
+    //ForwardedClientMessage("ViewNum", int) and ("Message", QByteArray) and ("ClientId", int)
     //ServerCipher ("Cipher", QByteArray)
     //Decrypted ("Decrypted", QByteArray) and ("ViewNum", int)
     //ClientAttendance ("ClientList", QList<QVariant>)
@@ -36,6 +38,7 @@ public:
       ViewChangeVote,
       ViewChangeNotification,
       ClientMessage,
+      ForwardedClientMessage,
       ServerCipher,
       Decrypted,
       ClientAttendance,
@@ -71,30 +74,37 @@ public:
     void sendViewChangeProposal(int viewNum);
     void sendRequest(int type);
     void sendInputRequest();
+    void forwardClientMessage(QVariantMap msg, const Connections::Id &from);
 
     //Receiving messages
     void switchServerMessage(QVariantMap map, const Connections::Id &from);
     void switchClientMessage(QVariantMap map, const Connections::Id &from);
 
-    //Phases
-    void startRound();
+    //Client functions
+    void clientRoundMessageSend(QString msg);
+
+public slots:
+    //Server Phases
+    void startServerRound();
     void startClientAttendance();
     void startCipherExchange();
     void startViewVoting();
 
-    //Client functions
-    void clientRoundMessageSend(QString msg);
 
 signals:
     void sendToSingleNode(Connections::Id peer, QVariantMap map);
     void broadcastToServers(QVariantMap map);
+    void broadcastToEveryone(QVariantMap map);
     void broadcastToDownstreamClients(QVariantMap map);
     void pushDataOut(QByteArray data);
+    void roundSuccessful();
+    void messageExchangeEnded();
 
 
 private:
     //Server functions
     void processClientMessage(QVariantMap map, const Connections::Id &from);
+    //void processForwardedClientMessage(QVariantMap map, const Connections::Id &from);
     void processClientList(QVariantMap map, const Connections::Id &from);
     void processViewChangeProposal(QVariantMap map, const Connections::Id &from);
     void processCipher(QVariantMap map, const Connections::Id &from);
@@ -111,8 +121,15 @@ private:
     QHash<int, QByteArray> *receivedClientMsgs;
     QHash<int, QByteArray> *receivedServerCiphers;
     QHash<int, QVariantMap> *viewChangeProposals;
-    QList<int> *respondedServers;
+
+
+    QList<int> *respondedServers_Attendance;
+    QList<int> *respondedServers_Cipher;
+    QList<int> *respondedServers_ViewChange;
+
+
     QList<int> *respondedClients;
+    //QList<int> *respondedForwardedClients;
     QList<int> *totalRoundClients;
 
 
@@ -124,6 +141,8 @@ private:
     SFT::SFTViewManager *sftViewManager;
 
     QByteArray lastCipher; //So that the slowest person in a round can get the ciphertexts
+
+    QTimer *timer;
 
 
 };

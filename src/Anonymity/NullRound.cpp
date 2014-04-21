@@ -24,6 +24,17 @@ namespace Anonymity {
     QPair<QByteArray, bool> data = GetData(1024);
     QByteArray msg = GetHeaderBytes() + data.first;
     GetOverlay()->Broadcast("SessionData", msg);
+
+    qDebug() << "Printing connection table";
+    this->GetOverlay()->GetConnectionTable().PrintConnectionTable();
+
+    //Checking connections
+    qDebug() << "Checking connections";
+
+    for (int i = 0; i < this->GetServers().Count(); i++)
+    {
+        qDebug() << "Server " << this->GetServers().GetId(i) << (this->GetOverlay()->GetConnectionTable().GetConnection(this->GetServers().GetId(i)) == 0);
+    }
   }
 
   void NullRound::ProcessPacket(const Connections::Id &from, const QByteArray &data)

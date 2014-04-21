@@ -44,6 +44,14 @@ bool SFTViewManager::inCurrentView(const Connections::Id &nodeId)
 
 bool SFTViewManager::addFailedServer(const Connections::Id &nodeId)
 {
+
+    if (this->downServers->contains(nodeId))
+    {
+        qDebug() << "Server is already down";
+        return false;
+    }
+
+    qDebug() << "Adding failed server: " << nodeId;
     this->downServers->append(nodeId);
     return this->inCurrentView(nodeId);
 }
@@ -64,30 +72,71 @@ QVector<Connections::Id> SFTViewManager::getCurrentServers()
     return connections;
 }
 
+bool SFTViewManager::isFirstInView(const Connections::Id &nodeId)
+{
+    return getCurrentServers().at(0) == nodeId;
+}
+
+int SFTViewManager::getNumLiveServers()
+{
+    return this->numServers - this->downServers->count();
+}
+
 int SFTViewManager::nextGoodView(int minViewNum)
 {
-    QVector<bool> *viewMembership = calcServerMembership(minViewNum);
+
+    QVector<int> *badServers = new QVector<int>();
     for (int j = 0; j < this->downServers->count(); j++)
     {
         const Connections::Id downServer = downServers->at(j);
         int index = this->m_servers.GetIndex(downServer);
 
-        //If any of the down servers are in a particular view, try the next view
-        if (viewMembership->at(index))
-        {
-            nextGoodView(minViewNum + 1);
-        }
+        qDebug() << "Downserver: " << downServer << index;
+        badServers->append(index);
     }
 
-    //If we got here none of the bad servers are in the next view
-    return minViewNum;
+    int nextViewNum = minViewNum + 1;
+
+    QVector<bool> *viewMembership;
+
+    while(true)
+    {
+        qDebug() << "Bad servers: " << *badServers;
+        viewMembership = calcServerMembership(nextViewNum);
+
+       bool viewGood = true;
+
+       for (int i = 0; i < badServers->count(); i++)
+       {
+           int index = badServers->at(i);
+
+           if (viewMembership->at(index))
+           {
+
+               viewGood = false;
+           }
+       }
+
+       if (viewGood)
+       {
+           qDebug() << "Found the view " << nextViewNum << ":" << *viewMembership << "Bad servers: " << *badServers;
+
+           qDebug() << "All votes" << *this->viewChangeProposals;
+           return nextViewNum;
+       }
+       nextViewNum++;
+
+
+       //TODO: Need to add this back in!!
+       //delete(viewMembership);
+    }
 }
 
 
 
 bool SFTViewManager::tooFewServers()
 {
-    return this->downServers->count() >= 2.0 * this->numServers / 3.0;
+    return (this->numServers - this->downServers->count()) < 2.0 * this->numServers / 3.0;
 }
 
 
@@ -101,6 +150,7 @@ int SFTViewManager::addViewChangeVote(int viewNum, bool vote, const Connections:
     QList<QVariant> voters = countMap.value("Voters", QList<QVariant>()).toList();
 
     //Don't allow double counting
+    //TODO: This isn't quite right...
     if (voters.contains(serverID))
     {
         qDebug() << "Redundant voters " << voters;
@@ -123,6 +173,11 @@ int SFTViewManager::addViewChangeVote(int viewNum, bool vote, const Connections:
     if (count >= 2.0 * this->m_servers.Count() / 3.0 && viewNum > getCurrentViewNum())
     {
         qDebug() << "Before " << *(this->currentView);
+        for (int i = 0; i < this->currentView->count(); i++)
+        {
+            qDebug() << this->m_servers.GetId(i);
+        }
+
         qDebug() << "Changed view";
         setNewView(viewNum);
         qDebug() << "After " << *(this->currentView);
@@ -186,6 +241,7 @@ QVector<bool> *SFTViewManager::calcServerMembership(int viewNum)
         }
     }
 
+    qDebug() << "Server membership: " << viewNum << *viewMembership;
     return viewMembership;
 }
 

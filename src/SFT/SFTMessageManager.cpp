@@ -29,10 +29,29 @@ SFTMessageManager::SFTMessageManager(Connections::Id localId,
     this->receivedClientMsgs = new QHash<int, QByteArray>();
     this->receivedServerCiphers = new QHash<int, QByteArray>();
     this->respondedClients = new QList<int>();
-    this->respondedServers = new QList<int>();
+
+
+    //this->respondedForwardedClients = new QList<int>();
+
+
+    this->respondedServers_Attendance = new QList<int>();
+    this->respondedServers_Cipher = new QList<int>();
+    this->respondedServers_ViewChange = new QList<int>();
+
     this->totalRoundClients = new QList<int>();
 
-    this->startRound();
+    this->timer = new QTimer();
+    this->timer->setSingleShot(true);
+    this->connect(this->timer, SIGNAL(timeout()), this, SLOT(startClientAttendance()));
+
+    if (isServer)
+    {
+        this->startServerRound();
+    }
+    else
+    {
+        this->roundPhase = SFTNullRound::ClientRoundPhase::ReceivePhase;
+    }
 }
 
 QList<QVariant> SFTMessageManager::getReceivedClients()
@@ -47,25 +66,35 @@ QList<QVariant> SFTMessageManager::getReceivedClients()
     return serializedClientList;
 }
 
-//TODO: Perhaps this is better named startMessageExchange()
-void SFTMessageManager::startRound()
-{
-    qDebug() << "\n\n\nStarting Round" << this->localId << "\n\n\n";
 
-    this->roundPhase = SFT::SFTNullRound::RoundPhase::CollectionPhase;
+//TODO: Perhaps this is better named startMessageExchange()
+void SFTMessageManager::startServerRound()
+{
+
+    qDebug() << "\n\n\nStarting Round" << this->localId << "\n\n\n";
+    qDebug() << "Initial View" << this->sftViewManager->getCurrentViewNum() << this->sftViewManager->getCurrentServers();
+
+    this->roundPhase = SFT::SFTNullRound::ServerRoundPhase::CollectionPhase;
     this->receivedClientMsgs->clear();
     this->receivedServerCiphers->clear();
     this->respondedClients->clear();
-    this->respondedServers->clear();
+    this->respondedServers_Attendance->clear();
+    this->respondedServers_Cipher->clear();
     this->totalRoundClients->clear();
+
+
+    //this->respondedServers_ViewChange->clear();
 }
 
 void SFTMessageManager::startClientAttendance()
 {
-    qDebug() << "\n\n\nStarting Client Attendance" << this->localId << "\n\n\n";
+    this->timer->stop();
 
-    this->respondedServers->clear();
-    this->respondedServers->append(this->localId.GetInteger().GetInt32());
+    qDebug() << "\n\n\nStarting Client Attendance" << this->localId << "\n\n\n";
+    qDebug() << "Number of responding clients: " << this->respondedClients->count();
+
+    this->respondedServers_Attendance->clear();
+    this->respondedServers_Attendance->append(this->localId.GetInteger().GetInt32());
     for (int i = 0; i < this->respondedClients->count(); i++)
     {
         int id = this->respondedClients->at(i);
@@ -73,14 +102,14 @@ void SFTMessageManager::startClientAttendance()
     }
     qDebug() << "Total round clients are: " << *totalRoundClients;
     QList<QVariant> serializedClientList = getReceivedClients();
-    this->roundPhase = SFT::SFTNullRound::RoundPhase::ClientAttendancePhase;
+    this->roundPhase = SFT::SFTNullRound::ServerRoundPhase::ClientAttendancePhase;
     QVariantMap map = QVariantMap();
     map.insert("Type", MessageTypes::ClientAttendance);
     map.insert("ClientList", QVariant(serializedClientList));
 
     emit this->broadcastToServers(map);
     qDebug() << "Sending ClientAttendance request" << this->localId;
-    sendRequest(SFT::SFTNullRound::RoundPhase::ClientAttendancePhase);
+    sendRequest(SFT::SFTNullRound::ServerRoundPhase::ClientAttendancePhase);
 
     //Need to ask for attendance lists from other servers
 
@@ -91,30 +120,44 @@ void SFTMessageManager::startCipherExchange()
     qDebug() << "\n\n\nStarting Cipher Exchange" << this->localId << "\n\n\n";
 
     this->receivedServerCiphers->clear();
-    this->respondedServers->clear();
-    this->respondedServers->append(this->localId.GetInteger().GetInt32());
-    this->roundPhase = SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase;
+    this->respondedServers_Cipher->clear();
+    this->respondedServers_Cipher->append(this->localId.GetInteger().GetInt32());
+    this->roundPhase = SFT::SFTNullRound::ServerRoundPhase::ExchangeCiphersPhase;
     QByteArray cipherText = this->createCipher();
     QVariantMap map = QVariantMap();
     map.insert("Type", MessageTypes::ServerCipher);
     map.insert("Cipher", cipherText);
     this->receivedServerCiphers->insert(this->localId.GetInteger().GetInt32(), cipherText);
+    qDebug() << this->localId << "Own cipher responses: " << cipherText;
     this->lastCipher = cipherText; //Save it for use when prompted
 
+    qDebug() << "My cipher: " << map;
+
     emit this->broadcastToServers(map);
-    sendRequest(SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase);
+    sendRequest(SFT::SFTNullRound::ServerRoundPhase::ExchangeCiphersPhase);
 }
 
+//Not sure if we should just not receive any votes until ready...
 void SFTMessageManager::startViewVoting()
 {
     qDebug() << "\n\n\nStarting View Voting" << this->localId << "\n\n\n";
 
-    this->roundPhase = SFT::SFTNullRound::RoundPhase::ViewChangeVotingPhase;
-    int newView = this->sftViewManager->nextGoodView(this->sftViewManager->getCurrentViewNum() + 1);
+    this->roundPhase = SFT::SFTNullRound::ServerRoundPhase::ViewChangeVotingPhase;
+
+
+    int newView = this->sftViewManager->nextGoodView(this->sftViewManager->getCurrentViewNum());
+
+    qDebug() << "View voting done";
+
+
     this->sftViewManager->proposeNewView(newView);
     this->sftViewManager->addViewChangeVote(newView, true, this->localId); //Remember to vote for myself
+
+    qDebug() << "Proposing a new view: " << newView;
+
     sendViewChangeProposal(newView);
-    sendRequest(SFT::SFTNullRound::RoundPhase::ViewChangeVotingPhase);
+    sendRequest(SFT::SFTNullRound::ServerRoundPhase::ViewChangeVotingPhase);
+
 }
 
 QVariantMap SFTMessageManager::genViewChangeProposal(int viewNum)
@@ -186,6 +229,20 @@ void SFTMessageManager::sendInputRequest()
     emit this->broadcastToDownstreamClients(map);
 }
 
+//Just send it to all of the servers, I suppose
+/*
+void SFTMessageManager::forwardClientMessage(QVariantMap msg, const Connections::Id &from)
+{
+    msg.insert("Type", SFTMessageManager::MessageTypes::ForwardedClientMessage);
+    msg.insert("ClientId", from.GetInteger().GetInt32());
+
+    //Send to the first online server
+    Connections::Id peer = this->sftViewManager->getCurrentServers().at(0);
+    qDebug() << "Forwarding to: " << peer << msg;
+    emit this->sendToSingleNode(peer, msg);
+    //emit this->broadcastToServers(msg);
+}*/
+
 QByteArray SFTMessageManager::encryptionKey(int serverID, int clientID, int keyLength, int numClients)
 {
     qDebug() << "ID's are " << serverID << clientID;
@@ -233,25 +290,30 @@ QByteArray SFTMessageManager::insertInSlot(QString msg)
 
     QByteArray testMsg;
     testMsg.append(fullMsg);
-    qDebug() << "Full msg: " << testMsg.replace('\0', ' ');
+    qDebug() << "Client: " << this->m_clients.Contains(this->localId) << this->m_clients.Count();
+    qDebug() << "Server: " << this->m_servers.Contains(this->localId) << this->m_servers.Count();
+    qDebug() << this->localId;
+    qDebug() << "Indeces: " << index << this->m_clients.Count();
+    qDebug() << "Full msg: " << fullMsg.length() << testMsg.replace('\0', ' ');
 
     return fullMsg;
 }
 
 QByteArray SFTMessageManager::encryptClientMessage(int clientID, QByteArray data)
 {
-    QByteArray xored = data;
+    QByteArray xored(data);
     QVector<Connections::Id> servers = this->sftViewManager->getCurrentServers();
     //Should only encrypt based on who is actually in the round!!
 
     qDebug() << "Client knows: " << servers.count() << "servers";
     for (int i = 0; i < servers.count(); i++)
     {
-        qDebug() << "Before xor: " << xored;
+        qDebug() << "Before xor: " << xored.length() << xored;
 
         int serverID = servers.at(i).GetInteger().GetInt32();
         //This should really be the number of clients * keylength
         QByteArray key = encryptionKey(serverID, clientID, SFT::SFTMessageManager::keyLength, this->m_clients.Count());
+        qDebug() << "Xoring bytes for client message encryption";
         xored = xorBytes(xored, key);
 
         qDebug() << "After xor: " << xored;
@@ -300,7 +362,7 @@ QByteArray SFTMessageManager::xorBytes(QByteArray a1, QByteArray a2)
 QByteArray SFTMessageManager::createCipher()
 {
     qDebug() << "All direct messages";
-    qDebug() << *receivedClientMsgs;
+    qDebug() << receivedClientMsgs->keys().length() << "received keys" << *receivedClientMsgs;
 
     //Xor's the bits from the client first
     int id = receivedClientMsgs->keys().value(0);
@@ -313,9 +375,15 @@ QByteArray SFTMessageManager::createCipher()
 
     int thisID = this->localId.GetInteger().GetInt32();
 
+    //If we're not in the view, then no need to get keys
+    if (!this->sftViewManager->inCurrentView(this->localId))
+    {
+        return xored;
+    }
+
     //Assuming fixed length messages
     //Gets the encryption key for all of the clients
-    qDebug() << totalRoundClients->count() << " clients" << *totalRoundClients;
+    qDebug() << totalRoundClients->count() << " total round clients" << *totalRoundClients;
     for (int i = 0; i < totalRoundClients->count(); i++)
     {
         int clientID = totalRoundClients->at(i);
@@ -367,6 +435,12 @@ void SFTMessageManager::switchServerMessage(QVariantMap map, const Connections::
         qDebug() << "Received a client message";
         processClientMessage(map, from);
     }
+    /*
+    else if ((MessageTypes) map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::ForwardedClientMessage)
+    {
+        qDebug() << "Received a forwarded client message";
+        processForwardedClientMessage(map, from);
+    }*/
     else if ((MessageTypes) map.value("Type").toInt() == SFT::SFTMessageManager::MessageTypes::ViewChangeVote)
     {
         qDebug() << "Received a view change vote message";
@@ -433,53 +507,61 @@ void SFTMessageManager::switchClientMessage(QVariantMap map, const Connections::
 
 void SFTMessageManager::processCipher(QVariantMap map, const Connections::Id &from)
 {
-    if (this->roundPhase != SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase)
+    if (this->roundPhase != SFT::SFTNullRound::ServerRoundPhase::ExchangeCiphersPhase)
     {
         qDebug() << "Wrong time for cipher texts" << this->roundPhase;
         return;
     }
 
+    /*
     if (!this->sftViewManager->inCurrentView(from))
     {
         qDebug() << "Sending server is not in current view, ignoring ciphertext";
         return;
-    }
+    }*/
 
-    if (this->respondedServers->contains(from.GetInteger().GetInt32()))
+    if (this->respondedServers_Cipher->contains(from.GetInteger().GetInt32()))
     {
         qDebug() << "Already received a message from this server";
         return;
     }
 
-    qDebug() << "Expecting " << this->sftViewManager->getViewSize() << " cipher responses" << this->localId;
-    qDebug() << "Received " << this->receivedServerCiphers->count() + 1 << " cipher responses" << this->localId;
+    QByteArray cipher = map.value("Cipher").toByteArray();
+
+
+    qDebug() << this->localId << "Expecting " << this->sftViewManager->getNumLiveServers() << " cipher responses";
+    qDebug() << this->localId << "Received " << this->receivedServerCiphers->count() + 1 << " cipher responses" << this->localId << cipher;
     int serverID = from.GetInteger().GetInt32();
 
-    QByteArray cipher = map.value("Cipher").toByteArray();
     receivedServerCiphers->insert(serverID, cipher);
 
-    if (!respondedServers->contains(serverID))
+    if (!respondedServers_Cipher->contains(serverID))
     {
-        respondedServers->append(serverID);
+        respondedServers_Cipher->append(serverID);
     }
     qDebug() << "Received cipher";
 
-    if (receivedServerCiphers->count() == this->sftViewManager->getViewSize())
+    if (receivedServerCiphers->count() == this->sftViewManager->getNumLiveServers())
     {
         //DONE WITH THE ROUND!
         //Should now decrypt and send back to clients
-        qDebug() << "Done with decryption" << this->localId;
         QVariantMap map = genDecryption(this->sftViewManager->getCurrentViewNum());
+        QByteArray decrypted = map.value("Decrypted").toByteArray();
+        qDebug() << "Done with decryption" << this->sftViewManager->getNumLiveServers() << this->sftViewManager->getCurrentViewNum() << this->localId << decrypted;
+
         //TODO: Should really only be sending to own clients...
         emit this->broadcastToDownstreamClients(map);
-        this->startRound();  //TODO: This is going to be a problem for synchronization...
+        emit this->roundSuccessful();
+        this->startServerRound();  //TODO: This is going to be a problem for synchronization...
+
+        emit this->pushDataOut(decrypted);
     }
 }
 
 void SFTMessageManager::processInputRequest(QVariantMap map, const Connections::Id &from)
 {
-    SFT::SFTNullRound::RoundPhase type = (SFT::SFTNullRound::RoundPhase) map.value("Request").toInt();
-    if (type == SFT::SFTNullRound::RoundPhase::CollectionPhase)
+    SFT::SFTNullRound::ServerRoundPhase type = (SFT::SFTNullRound::ServerRoundPhase) map.value("Request").toInt();
+    if (type == SFT::SFTNullRound::ServerRoundPhase::CollectionPhase)
     {
         qDebug() << "Received input request" << this->localId << "from " << from;
 
@@ -491,21 +573,22 @@ void SFTMessageManager::processInputRequest(QVariantMap map, const Connections::
 
 void SFTMessageManager::processInfoRequest(QVariantMap map, const Connections::Id &from)
 {
-    SFT::SFTNullRound::RoundPhase type = (SFT::SFTNullRound::RoundPhase) map.value("Request").toInt();
+    SFT::SFTNullRound::ServerRoundPhase type = (SFT::SFTNullRound::ServerRoundPhase) map.value("Request").toInt();
 
     //Not-in-view servers cannot participate in this
-    if (type == SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase)
+    if (type == SFT::SFTNullRound::ServerRoundPhase::ExchangeCiphersPhase)
     {
+        /*
         if (!this->sftViewManager->inCurrentView(this->localId))
         {
             qDebug() << "This local server is not in the current view" << this->localId;
             return;
-        }
+        }*/
 
         qDebug() << "Received ciphers request" << this->localId << "";
 
-        if (this->roundPhase >= SFT::SFTNullRound::RoundPhase::ExchangeCiphersPhase ||
-            this->roundPhase == SFT::SFTNullRound::RoundPhase::CollectionPhase)
+        if (this->roundPhase >= SFT::SFTNullRound::ServerRoundPhase::ExchangeCiphersPhase ||
+            this->roundPhase == SFT::SFTNullRound::ServerRoundPhase::CollectionPhase)
         {
             qDebug() << "Responding to ciphers request" << this->localId << "";
 
@@ -517,12 +600,12 @@ void SFTMessageManager::processInfoRequest(QVariantMap map, const Connections::I
             return;
         }
     }
-    else if (type == SFT::SFTNullRound::RoundPhase::ViewChangeVotingPhase)
+    else if (type == SFT::SFTNullRound::ServerRoundPhase::ViewChangeVotingPhase)
     {
         qDebug() << "Received voting" << this->localId << "";
 
         //It's okay if we're ahead, we still want to accomodate
-        if (this->roundPhase >= SFT::SFTNullRound::RoundPhase::ViewChangeVotingPhase)
+        if (this->roundPhase >= SFT::SFTNullRound::ServerRoundPhase::ViewChangeVotingPhase)
         {
             qDebug() << "Responding to voting" << this->localId << "";
 
@@ -531,26 +614,36 @@ void SFTMessageManager::processInfoRequest(QVariantMap map, const Connections::I
             QVariantMap resp = QVariantMap();
             int viewNum = map.value("ViewNum").toInt();
 
-            resp.insert("Type", QVariant(MessageTypes::ViewChangeVote));
+            qDebug() << resp << viewNum;
+
+            //TODO: Does this really do anything? Or should we just send our current view?
+            /*resp.insert("Type", QVariant(MessageTypes::ViewChangeVote));
             resp.insert("ViewNum", QVariant(viewNum));
             resp.insert("Vote", QVariant(this->sftViewManager->getProposedViewNum() == viewNum));
 
-            emit this->sendToSingleNode(from, resp);
+            emit this->sendToSingleNode(from, resp);*/
             return;
+        }
+
+        else
+        {
+            qDebug() << "Not yet in voting stage" << this->localId;
         }
     }
     //Not-in-view servers cannot participate in this, for now
-    else if (type == SFT::SFTNullRound::RoundPhase::ClientAttendancePhase)
+    else if (type == SFT::SFTNullRound::ServerRoundPhase::ClientAttendancePhase)
     {
+        /*
         if (!this->sftViewManager->inCurrentView(this->localId))
         {
             qDebug() << "This local server is not in the current view" << this->localId;
             return;
-        }
+        }*/
 
         qDebug() << "Received attendance request" << this->localId << "";
 
-        if (this->roundPhase >= SFT::SFTNullRound::RoundPhase::ClientAttendancePhase)
+        if (this->roundPhase == SFT::SFTNullRound::ServerRoundPhase::ClientAttendancePhase ||
+            this->roundPhase == SFT::SFTNullRound::ServerRoundPhase::ExchangeCiphersPhase)
         {
             qDebug() << "Responding to attendance request" << this->localId << "";
 
@@ -560,6 +653,11 @@ void SFTMessageManager::processInfoRequest(QVariantMap map, const Connections::I
 
             emit this->sendToSingleNode(from, resp);
             return;
+        }
+
+        else
+        {
+            qDebug() << "Not yet in attendance request stage" << this->localId;
         }
     }
     else
@@ -573,13 +671,18 @@ void SFTMessageManager::processViewChangeProposal(QVariantMap map, const Connect
 {
     qDebug() << "Local Id:" << this->localId;
     //TODO: What about the last person that gets here?
-    if (this->roundPhase != SFT::SFTNullRound::RoundPhase::ViewChangeVotingPhase)
+
+    /*
+    if (this->roundPhase != SFT::SFTNullRound::ServerRoundPhase::ViewChangeVotingPhase)
     {
         qDebug() << "Wrong time for view change voting" << this->roundPhase;
         return;
-    }
+    }*/
 
-    if (this->respondedServers->contains(from.GetInteger().GetInt32()))
+    qDebug() << "View change vote message:" << this->localId << from << map;
+
+
+    if (this->respondedServers_ViewChange->contains(from.GetInteger().GetInt32()))
     {
         qDebug() << "Already received a message from this server";
         return;
@@ -598,62 +701,70 @@ void SFTMessageManager::processViewChangeProposal(QVariantMap map, const Connect
     {
         //Should notify clients somehow
         QVariantMap map = this->genClientViewChangeNotification(viewChangeCode);
-        qDebug() << "View changed! " << this->sftViewManager->getCurrentViewNum();
+        qDebug() << "View changed! " << this->sftViewManager->getCurrentViewNum() << this->sftViewManager->getCurrentServers();
         emit this->broadcastToDownstreamClients(map);
 
+
+        /*
         QVariantMap map2 = this->genInputRequest();
 
         for (int i = 0; i < m_connections.count(); i++)
         {
             Connections::Id conn = m_connections.at(i);
             emit this->sendToSingleNode(conn, map2);
-        }
-        if (this->sftViewManager->inCurrentView(this->localId))
-        {
-            this->startRound();
-        }
+        }*/
+
+        //if (this->sftViewManager->inCurrentView(this->localId))
+        //{
+            this->startServerRound();
+        //}
         //If it's not in the round then just keep it stalling until it's in the view
-        else
+        /*else
         {
-            this->roundPhase = SFT::SFTNullRound::RoundPhase::CollectionPhase;
-        }
+            this->roundPhase = SFT::SFTNullRound::ServerRoundPhase::CollectionPhase;
+        }*/
+
+        this->respondedServers_ViewChange->clear();
     }
-    //Means that the view changed and also that the view change was rejected
+    //Means that we tried to change the view and also that the view change was rejected
     else if (viewChangeCode == -2)
     {
         //Start over
-        this->startRound();
+        this->startServerRound();
+        this->respondedServers_ViewChange->clear();
     }
 }
 
 void SFTMessageManager::processClientList(QVariantMap map, const Connections::Id &from)
 {
+    /*
     if (!this->sftViewManager->inCurrentView(this->localId))
     {
         qDebug() << "This local server is not in the current view" << this->localId;
         return;
-    }
+    }*/
 
-    if (this->roundPhase != SFT::SFTNullRound::RoundPhase::ClientAttendancePhase)
+    if (this->roundPhase != SFT::SFTNullRound::ServerRoundPhase::ClientAttendancePhase)
     {
         qDebug() << "Wrong time for client attendance" << this->roundPhase;
         return;
     }
 
+    /*
     if (!this->sftViewManager->inCurrentView(from))
     {
         qDebug() << "Sending server is not in current view, ignoring client list";
         return;
-    }
+    }*/
 
-    if (this->respondedServers->contains(from.GetInteger().GetInt32()))
+    if (this->respondedServers_Attendance->contains(from.GetInteger().GetInt32()))
     {
         qDebug() << "Already received a message from this server";
         return;
     }
 
-    qDebug() << "Expecting " << this->sftViewManager->getViewSize() << " attendance responses" << this->localId;
-    qDebug() << "Received " << this->respondedServers->count() + 1 << " attendance responses" << this->localId;
+    qDebug() << "Expecting " << this->sftViewManager->getNumLiveServers() << " attendance responses" << this->localId;
+    qDebug() << "Received " << this->respondedServers_Attendance->count() + 1 << " attendance responses" << this->localId;
 
     //Add all of the round clients into the list
     QList<QVariant> clientList = map.value("ClientList").toList();
@@ -664,27 +775,79 @@ void SFTMessageManager::processClientList(QVariantMap map, const Connections::Id
             this->totalRoundClients->append(clientList.at(i).toInt());
         }
     }
-    this->respondedServers->append(from.GetInteger().GetInt32());
+    this->respondedServers_Attendance->append(from.GetInteger().GetInt32());
 
     //TODO: This should really be ACTIVE servers
-    if (this->respondedServers->count() == this->sftViewManager->getViewSize())
+    if (this->respondedServers_Attendance->count() == this->sftViewManager->getNumLiveServers())
     {
         //Then we've got all of the clients
         startCipherExchange();
     }
 }
 
-//TODO: Cannot do duplicates!
-void SFTMessageManager::processClientMessage(QVariantMap map, const Connections::Id &from)
+/*
+void SFTMessageManager::processForwardedClientMessage(QVariantMap map, const Connections::Id &from)
 {
-    if (!this->sftViewManager->inCurrentView(this->localId))
+    if (this->roundPhase != SFT::SFTNullRound::ServerRoundPhase::CollectionPhase)
     {
-        qDebug() << "This local server is not in the current view" << this->localId;
+        qDebug() << "Cannot collect messages anymore";
         return;
     }
 
-    qDebug() << "Processing client message";
-    if (this->roundPhase != SFT::SFTNullRound::RoundPhase::CollectionPhase)
+    //TODO: Should probably also check that the sender is a server
+    if (this->m_servers.GetIndex(from) < 0)
+    {
+        qDebug() << "Sender of forwarded client message is not a server";
+        return;
+    }
+
+    int clientId = map.value("ClientId").toInt();
+
+    if (this->respondedForwardedClients->contains(clientId))
+    {
+        qDebug() << "Client already submitted message";
+        return;
+    }
+
+    qDebug() << "Received message from correct client";
+
+    int viewNum = map.value("ViewNum").toInt();
+
+
+    if (this->sftViewManager->getCurrentViewNum() != viewNum)
+    {
+        qDebug() << "Wrong view number!" << map << this->sftViewManager->getCurrentViewNum();
+        //TODO: Should we tell clients to change their views?
+        return;
+    }
+    qDebug() << "Received " << this->respondedForwardedClients->count() + 1 << " client messages";
+
+    if (!this->respondedForwardedClients->contains(clientId))
+    {
+        this->respondedForwardedClients->append(clientId);
+    }
+
+    QByteArray msg = map.value("Message").toByteArray();
+    receivedClientMsgs->insert(clientId, msg);
+
+    return;
+}*/
+
+
+//TODO: Cannot do duplicates!
+void SFTMessageManager::processClientMessage(QVariantMap map, const Connections::Id &from)
+{
+
+    /*
+    if (!this->sftViewManager->inCurrentView(this->localId))
+    {
+        qDebug() << "This local server is not in the current view" << this->localId;
+        forwardClientMessage(map, from);
+        return;
+    }*/
+
+    qDebug() << "Processing client message" << map << from;
+    if (this->roundPhase != SFT::SFTNullRound::ServerRoundPhase::CollectionPhase)
     {
         qDebug() << "Cannot collect messages anymore";
         return;
@@ -708,8 +871,8 @@ void SFTMessageManager::processClientMessage(QVariantMap map, const Connections:
 
     if (this->sftViewManager->getCurrentViewNum() != viewNum)
     {
-        qDebug() << "Wrong view number!" << map;
-        //Should we tell clients to change their views?
+        qDebug() << "Wrong view number!" << map << this->sftViewManager->getCurrentViewNum();
+        //TODO: Should we tell clients to change their views?
         return;
     }
     qDebug() << "Received " << this->respondedClients->count() + 1 << " client messages";
@@ -724,8 +887,20 @@ void SFTMessageManager::processClientMessage(QVariantMap map, const Connections:
         this->respondedClients->append(clientID);
     }
 
+    //TODO: Getting rid of this in favor of a timer
+    //TODO: Not every client can get their message sent in. Too bad?
     if (this->respondedClients->count() == this->m_connections.count())
     {
+        /*
+        if (this->sftViewManager->getCurrentServers().indexOf(this->localId) == 0)
+        {
+            qDebug() << "This is the first server in the view" << this->localId;
+            this->respondedClients->append(*(this->respondedForwardedClients));
+
+            //timer->start(50);
+            //return;
+        }*/
+
         //Switch into next phase
         startClientAttendance();
     }
@@ -757,22 +932,25 @@ void SFTMessageManager::processViewChangeNotification(QVariantMap map, const Con
 
 
     this->sftViewManager->setNewView(viewNum);
+    emit this->messageExchangeEnded();
 
     //TODO: Take this out later!
-    this->clientRoundMessageSend("def");
+    //this->clientRoundMessageSend("def");
 
 }
 
 //For the client
 void SFTMessageManager::processDecrypted(QVariantMap map)
 {
+    //TODO: Should probably check if we are in a receiving phase
+
     QByteArray b = map.value("Decrypted").toByteArray();
     QString finalOutput = QString(b).replace('\0', ' '); //Need this for displaying
     qDebug() << "Decrypted message" << map << b << finalOutput;
 
     //Call this in the NullRound
+    this->roundPhase = SFTNullRound::ClientRoundPhase::SendPhase;
     emit this->pushDataOut(b);
-
 }
 
 
