@@ -3,6 +3,7 @@
 
 #include <QVariant>
 #include <QTimer>
+#include <QDateTime>
 #include "Connections/Id.hpp"
 #include "SFT/SFTViewManager.hpp"
 #include "SFT/SFTNullRound.hpp"
@@ -144,6 +145,9 @@ private:
 
     QTimer *timer;
 
+
+    QDateTime roundStartTime;
+    QDateTime viewChangeStartTime;
 
 };
 }

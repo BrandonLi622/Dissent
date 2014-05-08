@@ -169,7 +169,7 @@ namespace Tests {
     qDebug() << "Finished SendTest";
   }
 
-  void SFTSendTest(const Sessions &sessions, int numOnline)
+  void SFTSendTest(const Sessions &sessions, int numOnline, int numServers, int numClients)
   {
     qDebug() << "Starting SFTSendTest";
     QList<QByteArray> messages;
@@ -258,7 +258,7 @@ namespace Tests {
       for(int idx = 0; idx < sink->Count(); idx++) {
           QByteArray temp(sink->At(idx).second); //Don't want to be modifiying sink->At(idx).second, so make a copy
           temp.replace('\0', ' ');
-          qDebug() << "Sink value" << idx << temp;
+          qDebug() << "Sink value"  << "(" << numServers << ", " << numClients << ")"  << idx << temp;
           //ASSERT_TRUE(messages.contains(sink->At(idx).second));
       }
     }
@@ -268,6 +268,8 @@ namespace Tests {
   void SFTDisconnectServer(Sessions &sessions, bool hard, QList<int> *disconnectedServers, int numOnline[1])
   {
     qDebug() << "Disconnecting server" << hard;
+    qDebug() << "Time for message exchange: Disconnecting server";
+    qDebug() << "Time to change view: Disconnecting server";
 
     int server_count = sessions.servers.count();
     CryptoRandom rand;
@@ -285,9 +287,9 @@ namespace Tests {
         idx = rand.GetInt(0, server_count);
         if (!disconnectedServers->contains(idx))
         {
+            disconnectedServers->append(idx);
             break;
         }
-        disconnectedServers->append(idx);
 
     }
     OverlayPointer op_disc = sessions.network.first[idx];

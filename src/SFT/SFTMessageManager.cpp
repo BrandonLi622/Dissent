@@ -71,6 +71,11 @@ QList<QVariant> SFTMessageManager::getReceivedClients()
 void SFTMessageManager::startServerRound()
 {
 
+    //So that we could get performance metrics
+    this->roundStartTime = QDateTime::currentDateTime();
+    qDebug() << "Message exchange starting: " << this->roundStartTime;
+
+
     qDebug() << "\n\n\nStarting Round" << this->localId << "\n\n\n";
     qDebug() << "Initial View" << this->sftViewManager->getCurrentViewNum() << this->sftViewManager->getCurrentServers();
 
@@ -139,7 +144,9 @@ void SFTMessageManager::startCipherExchange()
 
 //Not sure if we should just not receive any votes until ready...
 void SFTMessageManager::startViewVoting()
-{
+{    
+    this->viewChangeStartTime = QDateTime::currentDateTime();
+
     qDebug() << "\n\n\nStarting View Voting" << this->localId << "\n\n\n";
 
     this->roundPhase = SFT::SFTNullRound::ServerRoundPhase::ViewChangeVotingPhase;
@@ -554,6 +561,10 @@ void SFTMessageManager::processCipher(QVariantMap map, const Connections::Id &fr
         emit this->roundSuccessful();
         this->startServerRound();  //TODO: This is going to be a problem for synchronization...
 
+        QDateTime current = QDateTime::currentDateTime();
+        qDebug() << "Message exchange ending: " << current;
+        qDebug() << "Time for message exchange: "  << "(" << this->m_servers.Count() << ", "  << this->m_clients.Count()<< ")" << this->roundStartTime.msecsTo(current);
+
         emit this->pushDataOut(decrypted);
     }
 }
@@ -716,6 +727,12 @@ void SFTMessageManager::processViewChangeProposal(QVariantMap map, const Connect
 
         //if (this->sftViewManager->inCurrentView(this->localId))
         //{
+
+        QDateTime current = QDateTime::currentDateTime();
+
+        qDebug() << "View change started: " << this->viewChangeStartTime;
+        qDebug() << "View change ended: " << current;
+        qDebug() << "Time to change view: " << "(" << this->m_servers.Count() << ", "  << this->m_clients.Count()<< ")" << this->viewChangeStartTime.msecsTo(current);
             this->startServerRound();
         //}
         //If it's not in the round then just keep it stalling until it's in the view
@@ -727,9 +744,13 @@ void SFTMessageManager::processViewChangeProposal(QVariantMap map, const Connect
         this->respondedServers_ViewChange->clear();
     }
     //Means that we tried to change the view and also that the view change was rejected
+    //TODO: Wouldn't this mean that we can't start a new round? Should we kill the session?
     else if (viewChangeCode == -2)
     {
         //Start over
+        QDateTime current = QDateTime::currentDateTime();
+
+
         this->startServerRound();
         this->respondedServers_ViewChange->clear();
     }
